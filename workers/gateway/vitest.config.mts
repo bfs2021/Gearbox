@@ -96,6 +96,7 @@ export default workerTestConfig({
         "ATTENDANCE",
         "INVENTORY",
         "SCHEDULE",
+        "PLANNER",
       ].map((binding) => [binding, echo(binding)]),
     ),
     ORDERS: orders,

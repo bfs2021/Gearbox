@@ -24,6 +24,7 @@ import edgeIcon from "../assets/app-icons/edge.svg";
 import inventoryIcon from "../assets/app-icons/inventory.svg";
 import ordersIcon from "../assets/app-icons/orders.svg";
 import pitIcon from "../assets/app-icons/pit.svg";
+import plannerIcon from "../assets/app-icons/planner.svg";
 import scheduleIcon from "../assets/app-icons/schedule.svg";
 import scoutingIcon from "../assets/app-icons/scouting.svg";
 import shopIcon from "../assets/app-icons/shop.svg";
@@ -56,6 +57,7 @@ const ICONS: Partial<Record<string, string>> = {
   attendance: attendanceIcon,
   inventory: inventoryIcon,
   schedule: scheduleIcon,
+  planner: plannerIcon,
 };
 
 /** A section's icon: its app's, or Getting started's flag ("start", which has no app). */

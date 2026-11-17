@@ -102,6 +102,7 @@ const BINDINGS = {
   attendance: "ATTENDANCE",
   inventory: "INVENTORY",
   schedule: "SCHEDULE",
+  planner: "PLANNER",
 } as const satisfies Record<Worker, string>;
 
 /** Headers only the gateway sets. */
@@ -410,6 +411,7 @@ const DEV_APPS: Record<Worker, keyof typeof devPorts.apps> = {
   attendance: "attendance",
   inventory: "inventory",
   schedule: "schedule",
+  planner: "planner",
 };
 
 function devPage(request: Request, url: URL, app: Worker): Promise<Response> {

@@ -10,7 +10,7 @@ Each folder's `CLAUDE.md` only imports its `AGENTS.md` (`@AGENTS.md`), for tools
 | Portal (team home, admin pages) | `workers/portal/AGENTS.md` |
 | Platform (sign-up, console, app library, reports, docs site) | `workers/platform/AGENTS.md` |
 | Gateway (team addresses, dev gateway, icons) | `workers/gateway/AGENTS.md` |
-| Attendance, Scouting, Orders, Shop, Skill Tree, Inventory, Schedule, Pit, Edge | `workers/<app>/AGENTS.md` |
+| Attendance, Scouting, Orders, Shop, Skill Tree, Inventory, Schedule, Planner, Pit, Edge | `workers/<app>/AGENTS.md` |
 | Edge agent | `workers/edge/AGENTS.md` (also for `devices/edge-agent`) |
 | Pit log downloader, match logs | `devices/pit-log-downloader/AGENTS.md` |
 | Team appearance, colors, shared bar, theme, tutorial mode | `packages/ui/AGENTS.md` |
@@ -74,7 +74,7 @@ The apps are being brought into one design language. The plan of record is `docs
 ## Repository Structure
 
 pnpm workspaces:
-- `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, schedule, platform)
+- `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, schedule, planner, platform)
 - `workers/` — Cloudflare Workers: one per app, serving its page and its API at `/api`, plus `gateway`, which routes every hostname to them
 - `packages/` — shared libraries: `auth` (sign-in, tenancy helpers, manifests), `ui`, `site-config`, `slack`, `discord`, `demo`, `testing`
 - `devices/` — software on hardware: `edge-agent` (Bun, arm64 binary), `pit-log-downloader` (Node 24)
@@ -97,7 +97,7 @@ Stack: Hono, Drizzle (`drizzle-orm`, Hono and `@cloudflare/workers-types` are in
 - **Isolation test** (`@g3/testing/isolation`, `checkIsolation({ app, seed, snapshot, bodies, skip })`): every team-scoped app has one (`test/isolation.test.ts`). It seeds teams A and B, calls every route of the exported Hono `app` as A's admin, mentor, student and kiosk session with B's ids, and fails if an answer contains a marker only B has or B's snapshot changes. It skips `/internal/*`, which only other workers reach. It also calls every GET route with A's own ids and fails if A's data changes: a browser sends no Origin on a link or an image, so the gateway can't check where a GET came from, and **a GET must never change anything** a member could be tricked into. A GET that only saves a default or the caller's own visit goes in `writesOnGet`, with the reason.
 - **Moving a team's data:** a team that changes program changes id (`frc12345` → `ftc12345`), so every team-scoped app has `POST /internal/teams/:teamId/move { to }`: every row with `moveTeamRows(db, from, to, tables, keys)` from `@g3/auth` (one batch; `keys` renames the R2 keys stored in columns), its files with `moveR2Prefix` (a few hundred per call: answer `{ done: false }` until they're all moved, then `{ done: true }`), `moveTeamStorageRows` for its storage counts, and anything else keyed by the team (Shop re-registers its Onshape webhook, Edge drops its box link, Pit drops unfinished log uploads). It must be safe to run again. The platform calls it (`move: true` in the manifest; `workers/platform/src/moves.ts`). Each app's isolation test runs `checkTeamMove` (the new id has exactly what the old one had, the old one nothing, B untouched, a second move OK). A new team-scoped app adds it with its delete route.
 - **Deleting a team's data:** every team-scoped app has `DELETE /internal/teams/:teamId` (`/api/internal`, which the gateway never answers), deleting all its rows with `deleteTeamRows(db, teamId, tables)` from `@g3/auth` (one batch, children first; Shop also its R2 prefix and Onshape webhook, Edge its box key and link, Orders its catalog-copied note). The operators' console calls each app's (the platform's service bindings: every manifest with a `delete` hook, `workers/platform/src/registry.ts`) before G3ID's, and deletes nothing else if one fails; the app library calls it too, 90 days after a team switches the app off. Each app's isolation test also runs `checkTeamDeletion` (A's data all gone, B's untouched, a second delete OK). A new team-scoped app adds the route, `delete: true` and `move: true` in its manifest, its binding on the platform and the tests.
-- Done: Skill Tree, Pit, Attendance, Inventory, Orders, Shop, Edge, Scouting, Schedule. Left: Portal.
+- Done: Skill Tree, Pit, Attendance, Inventory, Orders, Shop, Edge, Scouting, Schedule, Planner. Left: Portal.
 
 ## App library (roadmap Phase 4)
 
@@ -156,12 +156,12 @@ pnpm -r --if-present test     # or pnpm --filter @g3/worker-<app> test
 
 `pnpm dev` starts every app, worker and the gateway (`pnpm dev:silent`: without the port summary). Ports are in `.dev-ports.json` (and each `vite.config.ts` / `wrangler.toml`; add a new one in both):
 
-| | g3id | shop | pit | portal | skill-tree | attendance | scouting | edge | orders | platform | gateway | inventory | schedule |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| app | 5173 | 5174 | 5175 | 5178 | 5180 | 5181 | 5182 | 5183 | 5184 | 5185 | — | 5186 | 5187 |
-| worker | 8787 | 8788 | 8789 | — | 8790 | 8791 | 8792 | 8793 | 8794 | 8795 | 8796 | 8797 | 8798 |
+| | g3id | shop | pit | portal | skill-tree | attendance | scouting | edge | orders | platform | gateway | inventory | schedule | planner |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| app | 5173 | 5174 | 5175 | 5178 | 5180 | 5181 | 5182 | 5183 | 5184 | 5185 | — | 5186 | 5187 | 5188 |
+| worker | 8787 | 8788 | 8789 | — | 8790 | 8791 | 8792 | 8793 | 8794 | 8795 | 8796 | 8797 | 8798 | 8799 |
 
-Each worker's inspector port is its port + 442 (g3id 9229 … schedule 9240). Mock edge agent: 8700.
+Each worker's inspector port is its port + 442 (g3id 9229 … planner 9241). Mock edge agent: 8700.
 
 **Team addresses in dev**: the gateway on 8796 serves `http://<number>-<app>.gearbox.localhost:8796` (site team G3 is 1648; platform `gearbox.localhost:8796`, console `admin.gearbox.localhost:8796`); one sign-in covers every app. It listens on 127.0.0.1: for curl, add `--resolve <host>:8796:127.0.0.1`. More in `workers/gateway/AGENTS.md`.
 

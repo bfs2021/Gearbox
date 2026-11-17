@@ -31,6 +31,7 @@ import edgeIcon from "../../assets/app-icons/edge.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
 import pitIcon from "../../assets/app-icons/pit.svg";
+import plannerIcon from "../../assets/app-icons/planner.svg";
 import scheduleIcon from "../../assets/app-icons/schedule.svg";
 import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
@@ -95,6 +96,12 @@ const APPS: App[] = [
     label: "Schedule",
     href: appUrl("schedule"),
     tile: scheduleIcon,
+  },
+  {
+    key: "planner",
+    label: "Planner",
+    href: appUrl("planner"),
+    tile: plannerIcon,
   },
   {
     key: "attendance",

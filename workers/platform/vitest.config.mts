@@ -466,6 +466,7 @@ export default workerTestConfig({
     ORDERS: teamApp(),
     PIT: teamApp(),
     SCHEDULE: teamApp(),
+    PLANNER: teamApp(),
     SHOP: teamApp(),
     SCOUTING: teamApp(),
     SKILL_TREE: teamApp(),

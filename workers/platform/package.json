@@ -33,6 +33,7 @@
     "@g3/worker-pit": "workspace:*",
     "@g3/worker-portal": "workspace:*",
     "@g3/worker-schedule": "workspace:*",
+    "@g3/worker-planner": "workspace:*",
     "@g3/worker-scouting": "workspace:*",
     "@g3/worker-shop": "workspace:*",
     "@g3/worker-skill-tree": "workspace:*",

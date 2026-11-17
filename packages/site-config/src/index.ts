@@ -185,6 +185,7 @@ export const TEAM_HOST_APPS = {
   attendance: "attendance",
   inventory: "inventory",
   schedule: "schedule",
+  planner: "planner",
 } as const satisfies Record<Exclude<AppName, "portal">, string>;
 
 /** A team's address for an app. The site's own team keeps the app addresses above. */

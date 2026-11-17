@@ -56,6 +56,7 @@ export const site = {
     attendance: { web: "attendance" },
     inventory: { web: null },
     schedule: { web: null },
+    planner: { web: null },
   },
 
   /** The team's public website, linked from the apps. */

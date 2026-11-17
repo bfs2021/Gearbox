@@ -31,6 +31,7 @@ export const APPS: [name: string, packageJson: string][] = [
   ["Attendance", "workers/attendance/package.json"],
   ["Inventory", "workers/inventory/package.json"],
   ["Schedule", "workers/schedule/package.json"],
+  ["Planner", "workers/planner/package.json"],
 ];
 
 export type ReleaseSummary = {

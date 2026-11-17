@@ -33,6 +33,7 @@ const WORKERS: Record<string, Exclude<AppName, "portal">> = {
   orders: "orders",
   pit: "pit",
   schedule: "schedule",
+  planner: "planner",
   scouting: "scouting",
   shop: "shop",
   "skill-tree": "skillTree",

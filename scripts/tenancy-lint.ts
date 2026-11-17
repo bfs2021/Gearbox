@@ -180,6 +180,12 @@ const APPS: App[] = [
       friends: "friends",
     },
   },
+  {
+    dir: "workers/planner",
+    teamTables: {
+      plans: "plans",
+    },
+  },
 ];
 
 /** The literal SQL a `sql` template writes: its text, not the `${…}` values put in. */

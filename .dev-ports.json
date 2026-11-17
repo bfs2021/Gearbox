@@ -59,6 +59,11 @@
       "port": 5187,
       "name": "Schedule",
       "url": "http://localhost:5187"
+    },
+    "planner": {
+      "port": 5188,
+      "name": "Planner",
+      "url": "http://localhost:5188"
     }
   },
   "workers": {
@@ -127,6 +132,12 @@
       "inspectorPort": 9240,
       "name": "Schedule Worker",
       "url": "http://localhost:8798"
+    },
+    "planner": {
+      "port": 8799,
+      "inspectorPort": 9241,
+      "name": "Planner Worker",
+      "url": "http://localhost:8799"
     },
     "gateway": {
       "port": 8796,

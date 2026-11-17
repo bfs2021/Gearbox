@@ -1,0 +1,9 @@
+# G3 Planner (plan the team's work)
+
+- Not released yet, and **empty**: the app and worker are set up with no features. What Planner is for is still to be decided; update this file as it grows.
+- `apps/planner` is a plugin-based UI like Schedule's (the shared top bar and theme), with one page, **Plans** (`/`, `src/plugins/plans/`), which is empty. `workers/planner` (Hono, Drizzle, D1 `PLANNER_DB`) answers `/health`, `/me` (`isMentor`, `isAdmin`) and the platform's internal hooks.
+- **What it holds** (migration `0001`, `src/db/schema.ts`): `plans` (title, who made it), a placeholder to build on. No route reads or writes it yet.
+- Ports: app 5188, worker 8799 (inspector 9241). Icon: a clipboard with a checklist (`apps/planner/public/favicon.svg`, also `apps/portal/src/assets/app-icons/planner.svg` and the platform's docs icon), with the PNGs and `.ico` drawn from the same shapes.
+- In the app library for every team, with a `preview` warning (`src/manifest.ts`) until it does something; not switched on for any team (no platform migration), and not on the platform's public home page or the issue forms' app list yet.
+- **Not on Cloudflare yet**: production's D1 `database_id` in `wrangler.toml` is a placeholder and staging's says it isn't created. Before it deploys: `wrangler d1 create g3-planner-prod` (paste the id), `pnpm staging:create` (staging's database and placeholder Worker), then migrate.
+- Team-scoped: every table carries `team_id`, and every query goes through `inTeam`/`withTeam` (in the tenancy lint). It has delete, move, export and demo hooks (the platform's `PLANNER` binding, `TEAM_TABLES` in the schema, children first) and `test/isolation.test.ts`. A new table goes in the tenancy lint, `TEAM_TABLES` and the isolation test's `TABLES`; a new route that takes ids gets team B's in the isolation test's `bodies`.
