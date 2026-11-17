@@ -1,5 +1,15 @@
 # @g3/worker-portal
 
+## 2.7.0
+
+### Minor Changes
+
+- 68c4748: FTC teams can sign up: choose FRC or FTC when signing up, and an FTC team's addresses are `ftc<number>.frcgearbox.com` and `ftc<number>-<app>.frcgearbox.com`. Teams that signed up before are asked once, by an admin, whether they're in FRC or FTC; an FTC team moves to its FTC addresses with all its data, and its old links keep working until an FRC team with the same number signs up. Operators can change a team's program from the console, and sign in to it through an FRC or FTC team.
+
+### Patch Changes
+
+- 2ef228f: Operator Access and Member Access are one page: Operator Access lists both when operators opened your team's details and when they opened your member list.
+
 ## 2.6.0
 
 ### Minor Changes

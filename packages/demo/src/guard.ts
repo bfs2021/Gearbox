@@ -57,6 +57,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   // The release tracker writes to an Onshape document.
   { app: "shop", method: "*", path: /^\/admin\/release-tracker/ },
   { app: "shop", method: "*", path: /^\/print\// },
+  // Planner's meeting overview posts to the team's chat.
+  { app: "planner", method: "POST", path: /^\/overviews\/?$/ },
   { app: "orders", method: "*", path: /^\/share-a-cart\/(connect|callback|disconnect)/ },
   { app: "orders", method: "POST", path: /^\/orders\/import/ },
   // AdvantageScope: its layout is the team's (each visitor's stays in their tab), and assets are

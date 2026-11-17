@@ -27,8 +27,18 @@ export async function resolveUserId(
 }
 
 export {
+  type ChatCommand,
+  type ChatCommandReply,
+  type ChatCommandRequest,
+  CHAT_COMMANDS,
+  chatCommand,
+} from "./chat-commands";
+export {
   type Member,
+  type TeamMessageRef,
   activeMembers,
+  editTeamMessage,
+  postTeamMessage,
   sendMemberDM,
   sendTeamMessage,
   teamHasApp,
@@ -39,6 +49,10 @@ export {
   deleteTeamRows,
   exportTeamRows,
   inTeam,
+  moveR2Prefix,
+  moveTarget,
+  moveTeamRows,
+  movedKey,
   teamExport,
   withTeam,
 } from "./scope";
@@ -55,6 +69,7 @@ export {
   StorageLimitError,
   type StorageEviction,
   clearTeamStorageLock,
+  moveTeamStorageRows,
   storageLimitResponse,
   withStorageLimit,
   withTeamStorageLock,

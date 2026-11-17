@@ -8,6 +8,7 @@ import { manifest as id } from "@g3/worker-g3id/manifest";
 import { manifest as inventory } from "@g3/worker-inventory/manifest";
 import { manifest as orders } from "@g3/worker-orders/manifest";
 import { manifest as pit } from "@g3/worker-pit/manifest";
+import { manifest as planner } from "@g3/worker-planner/manifest";
 import { manifest as portal } from "@g3/worker-portal/manifest";
 import { manifest as schedule } from "@g3/worker-schedule/manifest";
 import { manifest as scouting } from "@g3/worker-scouting/manifest";
@@ -30,6 +31,7 @@ export const MANIFESTS: Record<AppName, AppManifest> = {
   attendance,
   inventory,
   schedule,
+  planner,
 };
 
 /** Each app's service binding here, for its seed and delete hooks. */
@@ -40,6 +42,7 @@ export const BINDINGS: Partial<Record<AppName, keyof AppEnv["Bindings"]>> = {
   orders: "ORDERS",
   pit: "PIT",
   schedule: "SCHEDULE",
+  planner: "PLANNER",
   shop: "SHOP",
   scouting: "SCOUTING",
   skillTree: "SKILL_TREE",

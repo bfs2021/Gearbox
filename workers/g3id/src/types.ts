@@ -25,6 +25,8 @@ export type AppEnv = {
     DISCORD_CLIENT_ID: string;
     DISCORD_CLIENT_SECRET: string;
     DISCORD_BOT_TOKEN: string;
+    /** The Discord app's public key: checks that slash commands came from Discord (routes/discord.ts). */
+    DISCORD_PUBLIC_KEY?: string;
     DISCORD_REDIRECT_URI?: string;
     /** Encrypts secrets stored in D1, like each team's Slack bot token (`encryptSecret` in @g3/auth). */
     SECRETS_KEY?: string;

@@ -69,6 +69,10 @@ const CHAT_USES: Use[] = [
     text: "Shop posts releases and daily summaries to the channels set on its Admin page.",
   },
   { app: "schedule", text: "Schedule reminds people before their role changes." },
+  {
+    app: "planner",
+    text: "Planner posts meeting overviews that update as cards change, and members add cards with /gb-add.",
+  },
   { app: "scouting", text: "Scouting alerts the service crew about new tickets." },
 ];
 const SLACK_USES: Use[] = [

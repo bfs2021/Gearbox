@@ -34,6 +34,7 @@ const json = (body: unknown, status = 200) =>
 
 /** Channel posts apps asked G3ID to send on the team's chat, by team (tests read them back). */
 const chatMessages = new Map<string, Record<string, unknown>[]>();
+const chatEdits = new Map<string, Record<string, unknown>[]>();
 /** Lines apps added to a team's log (`logTeamChange`), and messages sent to all its admins. */
 const teamLogs = new Map<string, Record<string, unknown>[]>();
 const adminDms = new Map<string, Record<string, unknown>[]>();
@@ -114,10 +115,22 @@ export const g3idStub: ServiceStub = async (request) => {
       ),
     );
   }
+  // Edits to a posted message (`editTeamMessage`): recorded like the rest, and read back with a GET
+  // of /internal/teams/:id/chat/edits. A message whose channel is "C-GONE" can't be edited.
+  const edit = url.pathname.match(/^\/internal\/teams\/([^/]+)\/chat\/(message|edits)$/);
+  if (edit && (request.method === "PATCH" || edit[2] === "edits")) {
+    const teamId = decodeURIComponent(edit[1]);
+    if (request.method === "GET") return json(chatEdits.get(teamId) ?? []);
+    const body = (await request.json()) as { message?: { channel?: string } };
+    if (body.message?.channel === "C-GONE") return json({ error: "message_not_found" }, 502);
+    chatEdits.set(teamId, [...(chatEdits.get(teamId) ?? []), body]);
+    return json({ ok: true });
+  }
   // A line for the team's log (`logTeamChange`), and messages on the team's chat (Slack or
   // Discord): to every admin (the platform, when an app is switched on or off), to members by id
-  // (`sendMemberDM`) or to a channel (`sendTeamMessage`). Recorded, never sent; tests read them
-  // back (stub only) with a GET to the same path on env.G3ID.
+  // (`sendMemberDM`) or to a channel (`sendTeamMessage`, `postTeamMessage`, which get back a
+  // made-up Slack message). Recorded, never sent; tests read them back (stub only) with a GET to
+  // the same path on env.G3ID.
   const team = url.pathname.match(
     /^\/internal\/teams\/([^/]+)\/(audit|chat\/dm-admins|chat\/dm-members|chat\/message)$/,
   );
@@ -132,7 +145,19 @@ export const g3idStub: ServiceStub = async (request) => {
     if (request.method === "GET") return json(store.get(teamId) ?? []);
     const body = (await request.json()) as Record<string, unknown>;
     store.set(teamId, [...(store.get(teamId) ?? []), body]);
-    return json({ ok: true, sent: Array.isArray(body.userIds) ? body.userIds.length : undefined });
+    const message =
+      team[2] === "chat/message"
+        ? {
+            provider: "slack",
+            channel: body.channel,
+            id: `${Date.now()}.${store.get(teamId)?.length}`,
+          }
+        : undefined;
+    return json({
+      ok: true,
+      sent: Array.isArray(body.userIds) ? body.userIds.length : undefined,
+      message,
+    });
   }
   return json({ error: `G3ID stub has no ${url.pathname}` }, 404);
 };

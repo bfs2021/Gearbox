@@ -1,7 +1,7 @@
 {
   "name": "gearbox",
   "private": true,
-  "version": "2026.11.2",
+  "version": "2026.11.3",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -13,10 +13,11 @@
     "lint:license": "node scripts/license-lint.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "db:migrate:local": "pnpm -r --if-present db:migrate:local",
+    "db:migrate:local": "node scripts/migrate-local.ts",
     "db:migrate:remote": "pnpm -r --if-present db:migrate:remote",
     "db:migrate:staging": "pnpm -r --if-present db:migrate:staging",
     "configure": "node scripts/configure.ts",
+    "discord:commands": "node scripts/discord-commands.ts",
     "staging:create": "node scripts/staging-create.ts",
     "staging:copy-team": "node scripts/staging-copy-team.ts",
     "changeset": "changeset",

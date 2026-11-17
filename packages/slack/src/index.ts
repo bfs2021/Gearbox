@@ -9,6 +9,7 @@ export const SLACK_BOT_SCOPES =
 /**
  * Turns a message in Gearbox's chat format into Slack's mrkdwn. The format is the part of
  * Discord's Markdown both services can show, which Discord reads as it is: `**bold**`,
+ * `~~struck out~~`,
  * `[label](https://...)`, `> ` quotes, `<t:UNIX>` for a time each reader sees in their own zone,
  * Unicode emoji (not `:names:`) and line breaks.
  */
@@ -24,7 +25,22 @@ export function toSlack(text: string): string {
     .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label: string, url: string) => {
       return `<${url.replace(/&amp;/g, "&")}|${label.replace(/\|/g, "/")}>`;
     })
-    .replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
+    .replace(/\*\*([^*\n]+)\*\*/g, "*$1*")
+    .replace(/~~([^~\n]+)~~/g, "~$1~");
+}
+
+/**
+ * Someone's text (a name, a title) made safe to put inside a message in Gearbox's chat format:
+ * the characters that would start formatting (`*`, `~`, `` ` ``, `|`) are dropped and square
+ * brackets become round ones, so it shows as written and can't turn into a link.
+ */
+export function plainChatText(text: string): string {
+  return text
+    .replace(/[*~`|]/g, "")
+    .replace(/\[/g, "(")
+    .replace(/\]/g, ")")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export type SlackChannel = {
@@ -117,25 +133,49 @@ export async function sendDM(slackUserId: string, message: string, env: SlackBin
   await sendMessage(dmChannelId, message, env);
 }
 
+/** A message the bot posted: its channel and Slack's `ts`, which names it for editing. */
+export type SlackMessageRef = { channel: string; ts: string };
+
+/** Posts to a channel (or a DM's channel). Links get no previews. */
 export async function sendMessage(
   channel: string,
   message: string,
   env: SlackBindings,
+): Promise<SlackMessageRef> {
+  const data = await post<{ channel: string; ts: string }>(env, "chat.postMessage", {
+    channel,
+    text: message,
+    unfurl_links: false,
+    unfurl_media: false,
+  });
+  return { channel: data.channel, ts: data.ts };
+}
+
+/** Replaces the text of a message the bot posted. */
+export async function editMessage(
+  ref: SlackMessageRef,
+  message: string,
+  env: SlackBindings,
 ): Promise<void> {
-  const res = await fetch("https://slack.com/api/chat.postMessage", {
+  await post(env, "chat.update", { channel: ref.channel, ts: ref.ts, text: message });
+}
+
+/** A Web API method called with JSON; throws "Slack API error: <code>" when Slack refuses. */
+async function post<T>(env: SlackBindings, method: string, body: object): Promise<T> {
+  const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`,
     },
-    body: JSON.stringify({ channel, text: message, unfurl_links: false, unfurl_media: false }),
+    body: JSON.stringify(body),
   });
-
-  const data = (await res.json()) as { ok?: boolean; error?: string };
+  const data = (await res.json()) as { ok?: boolean; error?: string } & T;
   if (!data.ok) {
-    console.error("[Slack API Error]", { channel, message, error: data.error });
+    console.error("[Slack API Error]", { method, error: data.error });
     throw new Error(`Slack API error: ${data.error}`);
   }
+  return data;
 }
 
 export async function getUserInfo(
@@ -190,3 +230,31 @@ export async function verifySlackSignature(
   }
   return diff === 0;
 }
+
+/** A slash command as Slack sends it (form-encoded): who typed what, where. */
+export type SlackCommand = {
+  /** The command with its slash: "/gb-add". */
+  command: string;
+  /** What was typed after it, trimmed. */
+  text: string;
+  /** The Slack user who typed it. */
+  userId: string;
+  /** Their workspace, which names the team. */
+  workspaceId: string;
+  channelId: string;
+};
+
+/** Reads a slash command's body. Check `verifySlackSignature` first. */
+export function parseCommand(rawBody: string): SlackCommand {
+  const params = new URLSearchParams(rawBody);
+  return {
+    command: params.get("command") ?? "",
+    text: params.get("text")?.trim() ?? "",
+    userId: params.get("user_id") ?? "",
+    workspaceId: params.get("team_id") ?? "",
+    channelId: params.get("channel_id") ?? "",
+  };
+}
+
+/** An answer to a slash command that only the person who typed it sees, in Gearbox's format. */
+export const privateReply = (text: string) => ({ response_type: "ephemeral", text: toSlack(text) });

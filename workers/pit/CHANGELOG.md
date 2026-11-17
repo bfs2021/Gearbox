@@ -1,5 +1,15 @@
 # @g3/worker-pit
 
+## 4.1.0
+
+### Minor Changes
+
+- 68c4748: When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Patch Changes
+
+- 68c4748: Pairing asks whether your team is in FRC or FTC, so an FTC team pairs with its own Pit address. Computers paired before this stay paired as FRC teams.
+
 ## 4.0.0
 
 ### Major Changes

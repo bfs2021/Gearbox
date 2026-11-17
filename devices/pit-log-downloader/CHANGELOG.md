@@ -1,5 +1,11 @@
 # @g3/pit-log-downloader
 
+## 2.4.0
+
+### Minor Changes
+
+- 68c4748: Pairing asks whether your team is in FRC or FTC, so an FTC team pairs with its own Pit address. Computers paired before this stay paired as FRC teams.
+
 ## 2.3.1
 
 ### Patch Changes

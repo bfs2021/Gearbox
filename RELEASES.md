@@ -16,6 +16,84 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.11.3 (2026-11-15)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **6.0.0** (was 5.0.0) |
+| **Portal** | **2.7.0** (was 2.6.0) |
+| **Platform** | **5.0.0** (was 4.3.0) |
+| **Shop** | **5.1.0** (was 5.0.0) |
+| **Pit** | **4.1.0** (was 4.0.0) |
+| **Orders** | **2.5.0** (was 2.4.0) |
+| **Edge** | **2.5.0** (was 2.4.3) |
+| Edge agent | 0.7.0 |
+| **Pit log downloader** | **2.4.0** (was 2.3.1) |
+| **Scouting** | **4.1.0** (was 4.0.0) |
+| **Skill Tree** | **2.3.0** (was 2.2.3) |
+| **Attendance** | **2.3.0** (was 2.2.3) |
+| **Inventory** | **1.3.0** (was 1.2.3) |
+| **Schedule** | **0.5.0** (was 0.4.3) |
+
+### G3ID 6.0.0
+
+- FTC teams can sign up: choose FRC or FTC when signing up, and an FTC team's addresses are `ftc<number>.frcgearbox.com` and `ftc<number>-<app>.frcgearbox.com`. Teams that signed up before are asked once, by an admin, whether they're in FRC or FTC; an FTC team moves to its FTC addresses with all its data, and its old links keep working until an FRC team with the same number signs up. Operators can change a team's program from the console, and sign in to it through an FRC or FTC team.
+
+### Portal 2.7.0
+
+- FTC teams can sign up: choose FRC or FTC when signing up, and an FTC team's addresses are `ftc<number>.frcgearbox.com` and `ftc<number>-<app>.frcgearbox.com`. Teams that signed up before are asked once, by an admin, whether they're in FRC or FTC; an FTC team moves to its FTC addresses with all its data, and its old links keep working until an FRC team with the same number signs up. Operators can change a team's program from the console, and sign in to it through an FRC or FTC team.
+- Operator Access and Member Access are one page: Operator Access lists both when operators opened your team's details and when they opened your member list.
+
+### Platform 5.0.0
+
+- FTC teams can sign up: choose FRC or FTC when signing up, and an FTC team's addresses are `ftc<number>.frcgearbox.com` and `ftc<number>-<app>.frcgearbox.com`. Teams that signed up before are asked once, by an admin, whether they're in FRC or FTC; an FTC team moves to its FTC addresses with all its data, and its old links keep working until an FRC team with the same number signs up. Operators can change a team's program from the console, and sign in to it through an FRC or FTC team.
+- Operator Access and Member Access are one page: Operator Access lists both when operators opened your team's details and when they opened your member list.
+
+### Shop 5.1.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+- Releases from other Onshape documents in your company no longer show up in Shop or get posted to chat: only the document set up on the Admin page counts.
+- Releases from Onshape come in when only a primary webhook signing key is set, and admins see a banner when Onshape's events are unsigned or signed with other keys. The setup docs now say where to make the signing keys in Onshape.
+- Shop's Onshape settings call the Company ID field "Classroom/ Company ID", for teams on an Onshape classroom, show saved keys as dots, drop the hints under the boxes, link to a step-by-step setup guide, and say to paste the main assembly's address to fill in the document and assembly IDs.
+- On the Admin page, removing a subsystem or process is a small trash can, a long name stays readable on a phone, Shop Settings is now called Processes & Subsystems, and its Processes list links to the docs explaining each setting.
+
+### Pit 4.1.0
+
+- Pairing asks whether your team is in FRC or FTC, so an FTC team pairs with its own Pit address. Computers paired before this stay paired as FRC teams.
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Orders 2.5.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Edge 2.5.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Pit log downloader 2.4.0
+
+- Pairing asks whether your team is in FRC or FTC, so an FTC team pairs with its own Pit address. Computers paired before this stay paired as FRC teams.
+
+### Scouting 4.1.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Skill Tree 2.3.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Attendance 2.3.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Inventory 1.3.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Schedule 0.5.0
+
+- When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
 ## 2026.11.2 (2026-11-10)
 
 | App | Version |

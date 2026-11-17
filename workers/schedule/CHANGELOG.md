@@ -1,5 +1,11 @@
 # @g3/worker-schedule
 
+## 0.5.0
+
+### Minor Changes
+
+- 68c4748: When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
 ## 0.4.3
 
 ### Patch Changes

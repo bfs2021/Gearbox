@@ -3,6 +3,7 @@ import { workerTestConfig } from "@g3/testing/config";
 import { fakeDiscord } from "@g3/testing/discord";
 
 const sent: { channel: string; text: string }[] = [];
+const updated: { channel: string; ts: string; text: string }[] = [];
 
 // Turnstile's check: the token "pass" passes, anything else fails.
 const turnstile = async (request: Request) => {
@@ -95,11 +96,23 @@ const slack = (request: Request) => {
   }
   if (url.pathname === "/api/chat.postMessage") {
     return request.json().then((body) => {
-      sent.push(body as { channel: string; text: string });
+      const message = body as { channel: string; text: string };
+      sent.push(message);
+      return Response.json({ ok: true, channel: message.channel, ts: `1700000000.${sent.length}` });
+    });
+  }
+  // An edit; a message in a channel starting "CGONE" was deleted. GET /__updated gives them back.
+  if (url.pathname === "/api/chat.update") {
+    return request.json().then((body) => {
+      const edit = body as { channel: string; ts: string; text: string };
+      if (edit.channel.startsWith("CGONE"))
+        return Response.json({ ok: false, error: "message_not_found" });
+      updated.push(edit);
       return Response.json({ ok: true });
     });
   }
   if (url.pathname === "/__sent") return Response.json(sent);
+  if (url.pathname === "/__updated") return Response.json(updated);
   return Response.json({ ok: true });
 };
 
@@ -110,6 +123,12 @@ const logged = new Map<string, unknown[]>();
 const names = new Map<string, unknown>();
 const platform = async (request: Request) => {
   const path = new URL(request.url).pathname;
+  // A slash command handed on (src/lib/commands.ts): answered with what it got.
+  const command = path.match(/^\/api\/internal\/teams\/([^/]+)\/commands\/([^/]+)$/);
+  if (command) {
+    const { userId, text } = (await request.json()) as { userId: string; text: string };
+    return Response.json({ reply: `${command[2]} for ${command[1]}: ${userId} said "${text}"` });
+  }
   const named = path.match(/^\/api\/internal\/teams\/([^/]+)\/name$/);
   if (named) {
     const id = decodeURIComponent(named[1]);
@@ -137,6 +156,8 @@ export default workerTestConfig({
     DISCORD_CLIENT_ID: "test-discord-client",
     DISCORD_CLIENT_SECRET: "test-discord-secret",
     DISCORD_BOT_TOKEN: "test-discord-bot",
+    // Checks slash commands came from Discord; the tests sign them with its private half.
+    DISCORD_PUBLIC_KEY: "14ba227f784c12265427ac8770d1ba5affda2a7b07f1d84f2888d6bb6b5e8c52",
     SECRETS_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     // Google's and GitHub's sign-in (GitHub's signs its state with its secret).
     GOOGLE_CLIENT_SECRET: "test-google-secret",

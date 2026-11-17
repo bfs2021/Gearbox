@@ -45,6 +45,15 @@ export const SAFE_TEXT = {
     "District event",
     "Offseason project",
   ],
+  /** A to-do: a card on Planner's board. */
+  task: [
+    "Order spare bearings",
+    "Wire the drivetrain",
+    "Update the CAD",
+    "Practice autos",
+    "Write the build log",
+    "Test the new intake",
+  ],
   partName: [
     "Swerve module",
     "Intake roller",

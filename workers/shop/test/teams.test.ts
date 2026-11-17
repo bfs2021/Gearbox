@@ -132,6 +132,7 @@ describe("Onshape", () => {
     expect(mine).toMatchObject({
       documentId: "docA",
       hasWebhookKeys: true,
+      hasSecondaryWebhookKey: false,
       fromWorkerSecrets: false,
     });
     expect(JSON.stringify(mine)).not.toContain("a-secret-key");
@@ -168,6 +169,7 @@ describe("Onshape", () => {
     }
     const event = (partNumber: string) => ({
       event: "onshape.revision.created",
+      documentId: "doc",
       elementType: 0,
       elementId: "el",
       partNumber,

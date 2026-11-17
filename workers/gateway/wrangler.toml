@@ -93,6 +93,10 @@ service = "inventory"
 binding = "SCHEDULE"
 service = "schedule"
 
+[[services]]
+binding = "PLANNER"
+service = "planner"
+
 [env.production]
 name = "gateway-production"
 workers_dev = false
@@ -237,6 +241,10 @@ service = "inventory-production"
 binding = "SCHEDULE"
 service = "schedule-production"
 
+[[env.production.services]]
+binding = "PLANNER"
+service = "planner-production"
+
 [[env.production.ratelimits]]
 name = "REQUEST_LIMITER"
 namespace_id = "10001"
@@ -323,6 +331,10 @@ service = "inventory-staging"
 [[env.staging.services]]
 binding = "SCHEDULE"
 service = "schedule-staging"
+
+[[env.staging.services]]
+binding = "PLANNER"
+service = "planner-staging"
 
 [[env.staging.ratelimits]]
 name = "REQUEST_LIMITER"

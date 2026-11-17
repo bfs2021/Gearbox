@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 9 November 2026.
+Last updated: 17 November 2026.
 
 ## In short
 
@@ -35,13 +35,14 @@ We collect only what the apps need to work.
 | Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when; the computers paired as log downloaders, with each one's name, who paired it, when, when it was last heard from and what it last said it was doing (connected to the robot, copying, uploading); and the robot's match logs those computers upload (the robot's own data from each match; at most 20 per team), kept until the team deletes them; AdvantageScope's preferences and layout for the team, with who last changed each; and the field, robot and joystick models mentors upload to it, with who uploaded each and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
 | Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which chat reminders (Slack or Discord) were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
+| Planner | The team's cards, which column each is in and who made it (in Gearbox or with `/gb-add` in the team's chat), and which members put themselves on each card; the channel chosen for meeting overviews, and for each overview posted, the chat message, who sent it, when, and which cards it has listed | Members and mentors |
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Edge (only for a team that runs its own Edge box) | The devices on the team's shop network: each one's hardware (MAC) address, the name it gives itself, a name an admin gives it, its last internet address on that network, and when it was first and last seen; how much data each device used; the sites each device used and how much data each took; the team's blocked sites and the exceptions admins grant a device, with who granted each and why; and a log of what admins changed | The team's Edge box and its admins |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
 | Problem reports | What you write when you report a problem or an idea from an app's menu, the page's address (without anything after `?`), the app and Gearbox versions, your browser, your team, that you sent it, your reporter ID (a random ID given to you with your first report) and, if you choose to add it, your name | You, when you send one |
 | Visits to our public page | How many visits frcgearbox.com's home page had each day, and how many of them were by someone signed in. Only these daily totals: nothing that identifies a visitor | Counted when the page opens |
-| Team record | Team name, FRC team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
+| Team record | Team name, program (FRC or FTC) and team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
 
 We do not ask for, and teams should not enter, home addresses, government identifiers, health information or payment card details.
 
@@ -147,9 +148,9 @@ Depending on where you live, the law may give you further rights, such as the ri
 
 ## 10. Students and children
 
-Most Gearbox members are high-school students, and we have designed it with that in mind.
+Most Gearbox members are high-school and middle-school students, and we have designed it with that in mind.
 
-- Members must be at least 13 years old. We do not knowingly allow accounts for children under 13. If we learn of one, we delete it.
+- Members must be at least 13 years old. We do not knowingly allow accounts for children under 13, including the younger members of FTC teams. If we learn of one, we delete it.
 - Only an adult aged 18 or over can create a team.
 - Each team is responsible for having whatever permission its school, organization or members' parents require, including any consent that the law of its country requires for members under a certain age.
 - A parent or guardian with a question about a student's information should ask the team's lead mentor first, and may contact us at contact@frcgearbox.com.
@@ -171,7 +172,7 @@ We use no advertising or analytics cookies and no third-party trackers. Every co
 | --- | --- | --- |
 | `g3_session` | Keeps you signed in | 7 days |
 | `g3_theme` | Your choice of light or dark mode | 1 year |
-| `g3_team` | The FRC number of the team this browser last opened, so its home and our public page can take you back to it. Never who you are | 1 year |
+| `g3_team` | The program and number of the team this browser last opened, so its home and our public page can take you back to it. Never who you are | 1 year |
 | `g3_tutorial` | That Tutorial mode is open; removed when you close it | 1 year |
 | `g3_tutorial_doc` | The help page to open next, while Tutorial mode follows you to another app | 30 seconds |
 | `g3_team_ui` | Tells your other open apps to load your team's new appearance after an admin saves it | 1 day |

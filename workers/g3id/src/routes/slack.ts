@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { signInCallbackApiUrl } from "@g3/site-config";
-import { SLACK_BOT_SCOPES, sendDM, verifySlackSignature } from "@g3/slack";
+import {
+  SLACK_BOT_SCOPES,
+  parseCommand,
+  privateReply,
+  sendDM,
+  verifySlackSignature,
+} from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import { coreSlackLinkCodes } from "../db/schema";
+import { runChatCommand } from "../lib/commands";
 import { handleSlackCode } from "../lib/slack-code";
 import {
   removeInstallation,
@@ -259,4 +266,21 @@ export const slackRouter = new Hono<AppEnv>()
     );
 
     return c.text("", 200);
+  })
+  // Gearbox's own commands (CHAT_COMMANDS in @g3/auth: /gb-add, ...), all at this one address:
+  // the member's own app answers, and only they see it (lib/commands.ts).
+  .post("/commands/gb", async (c) => {
+    const rawBody = await c.req.text();
+    if (!(await verifySlackSignature(c.req.raw, rawBody, c.env))) return c.text("", 401);
+    const command = parseCommand(rawBody);
+    const reply = await runChatCommand(c.env, {
+      provider: "slack",
+      teamId: await teamForWorkspace(c.env, command.workspaceId),
+      chatUserId: command.userId,
+      // Staging's Slack app shares G3's workspace with production's, so its commands end in
+      // "-staging" (/gb-add-staging; docs/deploy.md).
+      name: command.command.replace(/-staging$/, ""),
+      text: command.text,
+    });
+    return c.json(privateReply(reply));
   });

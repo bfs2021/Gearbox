@@ -22,6 +22,7 @@ const WORD_APPS = {
   skillTree: "SKILL_TREE",
   inventory: "INVENTORY",
   schedule: "SCHEDULE",
+  planner: "PLANNER",
   edge: "EDGE",
   scouting: "SCOUTING",
 } as const;
