@@ -22,6 +22,7 @@
     "@g3/auth": "workspace:*",
     "@g3/demo": "workspace:*",
     "@g3/site-config": "workspace:*",
+    "@g3/slack": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:"
   },

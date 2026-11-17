@@ -30,7 +30,7 @@ service = "g3id-production"
 [[env.production.d1_databases]]
 binding = "PLANNER_DB"
 database_name = "g3-planner-prod"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "a208f53d-395e-4b77-93d2-aefaee00a67a"
 migrations_dir = "src/db/migrations"
 
 [env.production.vars]
@@ -63,7 +63,7 @@ service = "g3id-staging"
 [[env.staging.d1_databases]]
 binding = "PLANNER_DB"
 database_name = "g3-planner-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "c8684218-ce4e-40a8-b461-44b08b6ff797"
 migrations_dir = "src/db/migrations"
 
 [env.staging.vars]

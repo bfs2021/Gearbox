@@ -8,7 +8,7 @@
 // - A channel whose id starts with 3 is one the bot can't see (Missing Access).
 // - Every server has the channels in CHANNELS. DMs and posts are recorded: GET
 //   https://discord.com/__sent gives them back as { channel, content }, a DM's channel being
-//   "dm-<user id>".
+//   "dm-<user id>"; edits likewise at /__edited.
 
 /** A random Discord id (18 digits), starting with `prefix`. */
 export function snowflake(prefix = "1"): string {
@@ -30,6 +30,7 @@ export const DISCORD_CHANNELS = {
 };
 
 const sent: { channel: string; content: string }[] = [];
+const edited: { channel: string; message: string; content: string }[] = [];
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const error = (status: number, code: number, message: string) => json({ code, message }, status);
@@ -39,6 +40,7 @@ export async function fakeDiscord(request: Request): Promise<Response> {
   const path = url.pathname.replace(/^\/api\/v10/, "");
   const auth = request.headers.get("Authorization") ?? "";
   if (path === "/__sent") return json(sent);
+  if (path === "/__edited") return json(edited);
 
   if (path === "/oauth2/token" && request.method === "POST") {
     const code = String((await request.formData()).get("code") ?? "");
@@ -79,6 +81,15 @@ export async function fakeDiscord(request: Request): Promise<Response> {
     if (content.length > 2000) return error(400, 50035, "Invalid Form Body");
     sent.push({ channel, content });
     return json({ id: snowflake(), channel_id: channel, content });
+  }
+
+  // An edit to a message the bot posted. GET https://discord.com/__edited gives them back.
+  const edit = path.match(/^\/channels\/([^/]+)\/messages\/([^/]+)$/);
+  if (edit && request.method === "PATCH") {
+    const { content } = (await request.json()) as { content: string };
+    if (content.length > 2000) return error(400, 50035, "Invalid Form Body");
+    edited.push({ channel: edit[1], message: edit[2], content });
+    return json({ id: edit[2], channel_id: edit[1], content });
   }
 
   const guild = path.match(/^\/guilds\/(\d+)(\/.*)?$/);

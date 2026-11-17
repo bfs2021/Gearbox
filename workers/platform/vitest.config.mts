@@ -348,6 +348,15 @@ function teamApp() {
     const path = new URL(request.url).pathname;
     if (path === "/api/internal/deleted") return Response.json(deleted);
     if (path === "/api/internal/moved") return Response.json(moves);
+    // A slash command (src/commands.ts): answered with what it got.
+    const command = path.match(/^\/api\/internal\/teams\/([^/]+)\/commands\/([^/]+)$/);
+    if (command && request.method === "POST") {
+      return request
+        .json()
+        .then(({ userId, text }) =>
+          Response.json({ reply: `${command[2]} for ${command[1]}: ${userId} said "${text}"` }),
+        );
+    }
     const move = path.match(/^\/api\/internal\/teams\/([^/]+)\/move$/);
     if (move && request.method === "POST") {
       const id = decodeURIComponent(move[1]);

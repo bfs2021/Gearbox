@@ -1,20 +1,23 @@
 ---
 title: Set up Planner
-summary: Switch it on, then add your first cards.
+summary: Switch it on and choose where meeting overviews go.
 order: 0
-pages: /
-access: everyone
+pages: /admin
+access: mentor
 ---
 
 ## Checklist
 
 - [ ] An admin switches Planner on for the team on Manage Apps, in Portal
-- [ ] On the [Board](team:planner/), type a card's title above the columns and choose **Add card**. It goes into **Not Started**
+- [ ] Your team's Slack or Discord is connected (Integrations, in Portal)
+- [ ] On Planner's [Admin](team:planner/admin) page, choose the channel for meeting overviews and choose **Save**
 
-## Using the board
+## Meeting overviews
 
-- **Move a card**: drag it to another column or up and down in one. On a phone, press and hold a card, then drag.
-- **Put yourself on a card**: choose **Add me** on it. Everyone sees who's on each card; **Remove me** takes you off.
-- **Rename or move a card**: click it.
-- **Delete a card** (admins only): choose the trash can beside **Add me** on it. It's deleted for everyone and can't be undone.
-- With a keyboard, **Space** picks up a card, the arrow keys move it and **Space** puts it down; **Enter** opens it.
+Mentors and admins send a meeting overview from the board. It's posted to the channel you choose here, listing what's Not Started and In Progress, and it updates as the team works: cards that get done are crossed off, and new ones are added. Only the latest overview keeps updating.
+
+The bot must be able to post in the channel. In Slack, add the bot to a private channel first; in Discord, allow its role in one. The channel picker says when it can't.
+
+## Adding cards from chat
+
+Members can add a card to Not Started from any channel by typing `/gb-add` and the card, for example `/gb-add Order more bolts`. Only they see the reply. Their Slack or Discord account has to be linked to their Gearbox account, which it is if they sign in with it.

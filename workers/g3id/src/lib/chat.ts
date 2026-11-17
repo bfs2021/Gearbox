@@ -79,19 +79,53 @@ export async function sendChatDM(
   }
 }
 
-/** A post from the team's bot in one of its channels. Throws when it isn't posted. */
+/** A message the team's bot posted: enough to edit it later (`editInChannel`). */
+export type ChatMessageRef = { provider: ChatProvider; channel: string; id: string };
+
+/**
+ * A post from the team's bot in one of its channels. Throws when it isn't posted. Gives back the
+ * message (on Discord, the first of the pieces a long one is split into).
+ */
 export async function postToChannel(
   env: Env,
   teamId: string,
   chat: TeamChat,
   channelId: string,
   text: string,
-): Promise<void> {
+): Promise<ChatMessageRef> {
   try {
     if (chat.provider === "slack") {
-      await slack.sendMessage(channelId, slack.toSlack(text), chat.slack);
+      const posted = await slack.sendMessage(channelId, slack.toSlack(text), chat.slack);
+      return { provider: "slack", channel: posted.channel, id: posted.ts };
+    }
+    const [id] = await discord.sendMessage(chat.bot, channelId, text);
+    return { provider: "discord", channel: channelId, id };
+  } catch (err) {
+    await checkDiscordStillThere(env, teamId, chat, err);
+    throw err;
+  }
+}
+
+/** Replaces the text of a message the team's bot posted. Throws when it isn't edited. */
+export async function editInChannel(
+  env: Env,
+  teamId: string,
+  chat: TeamChat,
+  message: ChatMessageRef,
+  text: string,
+): Promise<void> {
+  if (message.provider !== chat.provider) {
+    throw new Error(`The team's chat is ${CHAT_LABELS[chat.provider]} now.`);
+  }
+  try {
+    if (chat.provider === "slack") {
+      await slack.editMessage(
+        { channel: message.channel, ts: message.id },
+        slack.toSlack(text),
+        chat.slack,
+      );
     } else {
-      await discord.sendMessage(chat.bot, channelId, text);
+      await discord.editMessage(chat.bot, message.channel, message.id, text);
     }
   } catch (err) {
     await checkDiscordStillThere(env, teamId, chat, err);

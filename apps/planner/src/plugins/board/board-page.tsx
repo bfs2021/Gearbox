@@ -24,6 +24,7 @@ import { AddCard } from "./add-card";
 import { CardDialog } from "./card-dialog";
 import { BoardColumn, CardFace } from "./column";
 import { type People, PeopleContext } from "./people";
+import { SendOverview } from "./send-overview";
 
 // The team's board: cards in three columns, dragged between and within them. Everyone's board
 // follows the others' by asking for the cards every few seconds.
@@ -49,7 +50,7 @@ function columnOf(columns: Columns, id: UniqueIdentifier): Status | null {
 }
 
 export function BoardPage() {
-  const { canEdit, isAdmin, userId: me } = useAuthUser();
+  const { canEdit, isAdmin, isMentor, userId: me } = useAuthUser();
   const [columns, setColumns] = useState<Columns | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragged, setDragged] = useState<BoardCard | null>(null);
@@ -254,6 +255,7 @@ export function BoardPage() {
             : "Everyone on the team sees the same board. Sign in on your own device to change it."
         }
         width="wide"
+        actions={isMentor ? <SendOverview /> : undefined}
       >
         {error && <ErrorBanner message={error} />}
         {canEdit && (

@@ -12,11 +12,12 @@ import { call } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { app } from "../src/index";
 
-// Two teams, each with a card with someone on it. Every route, called as team A's admin, mentor, student and kiosk
+// Two teams, each with a card with someone on it, an overview channel and an overview listing the
+// card. Every route, called as team A's admin, mentor, student and kiosk
 // session with team B's ids, must show none of B's and change nothing of B's.
 
 const database = (env as unknown as { PLANNER_DB: D1Database }).PLANNER_DB;
-const TABLES = ["cards", "card_members"];
+const TABLES = ["cards", "card_members", "planner_settings", "overviews", "overview_cards"];
 
 async function seed(team: TeamUsers): Promise<Seeded> {
   const tag = crypto.randomUUID().slice(0, 8);
@@ -30,6 +31,22 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   await database
     .prepare("INSERT INTO card_members (team_id, card_id, user_id, added_at) VALUES (?, ?, ?, ?)")
     .bind(team.teamId, card?.id, team.student.id, now)
+    .run();
+  await database
+    .prepare(
+      "INSERT INTO planner_settings (team_id, overview_channel, updated_by, updated_at) VALUES (?, 'C0ISOLATE', ?, ?)",
+    )
+    .bind(team.teamId, team.mentor.id, now)
+    .run();
+  const overview = await database
+    .prepare(
+      "INSERT INTO overviews (team_id, provider, channel, message_id, last_text, posted_by, posted_at) VALUES (?, 'slack', 'C0ISOLATE', '1.1', ?, ?, ?) RETURNING id",
+    )
+    .bind(team.teamId, `Overview ${tag}`, team.mentor.id, now)
+    .first<{ id: number }>();
+  await database
+    .prepare("INSERT INTO overview_cards (team_id, overview_id, card_id) VALUES (?, ?, ?)")
+    .bind(team.teamId, overview?.id, card?.id)
     .run();
   return { params: { id: String(card?.id) }, markers: [`Card ${tag}`] };
 }
@@ -56,6 +73,7 @@ it("keeps every team's board to itself", async () => {
       "POST /cards": { title: "Mine" },
       "PATCH /cards/:id": { title: "Mine" },
       "PUT /cards/:id/move": { status: "done", index: 0 },
+      "PUT /settings": { overviewChannel: "C0MINE" },
     }),
   });
   expect(problems).toEqual([]);

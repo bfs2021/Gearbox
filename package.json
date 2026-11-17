@@ -17,6 +17,7 @@
     "db:migrate:remote": "pnpm -r --if-present db:migrate:remote",
     "db:migrate:staging": "pnpm -r --if-present db:migrate:staging",
     "configure": "node scripts/configure.ts",
+    "discord:commands": "node scripts/discord-commands.ts",
     "staging:create": "node scripts/staging-create.ts",
     "staging:copy-team": "node scripts/staging-copy-team.ts",
     "changeset": "changeset",

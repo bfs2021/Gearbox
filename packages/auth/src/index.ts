@@ -27,8 +27,18 @@ export async function resolveUserId(
 }
 
 export {
+  type ChatCommand,
+  type ChatCommandReply,
+  type ChatCommandRequest,
+  CHAT_COMMANDS,
+  chatCommand,
+} from "./chat-commands";
+export {
   type Member,
+  type TeamMessageRef,
   activeMembers,
+  editTeamMessage,
+  postTeamMessage,
   sendMemberDM,
   sendTeamMessage,
   teamHasApp,

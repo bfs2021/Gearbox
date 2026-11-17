@@ -7,24 +7,17 @@ import {
   requireOAuthSession,
   withTeam,
 } from "@g3/auth";
-import { asc, eq, max, ne } from "drizzle-orm";
+import { asc, eq, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createDb } from "../db";
 import { type Status, cardMembers, cards } from "../db/schema";
+import { CARD_COLUMNS, addCard, afterChange } from "../lib/cards";
 import { nowSeconds, parseId, parseStatus, parseTitle } from "../lib/input";
 import type { AppEnv } from "../types";
 
 // The team's board. Everyone signed in reads it; everyone but a kiosk adds, renames and moves
 // cards, and puts themselves on a card or takes themselves off. Only admins delete cards. Pages poll GET /cards, so everyone's board follows the others'.
-
-/** What a page gets for a card. */
-const COLUMNS = {
-  id: cards.id,
-  title: cards.title,
-  status: cards.status,
-  sortOrder: cards.sortOrder,
-} as const;
 
 const TITLE_ERROR = "Give the card a title (up to 200 characters).";
 
@@ -60,7 +53,7 @@ export const cardsRouter = new Hono<AppEnv>()
     const teamId = c.get("teamId");
     const [rows, members] = await Promise.all([
       db
-        .select(COLUMNS)
+        .select(CARD_COLUMNS)
         .from(cards)
         .where(inTeam(cards, teamId))
         .orderBy(asc(cards.status), asc(cards.sortOrder), asc(cards.id))
@@ -85,29 +78,9 @@ export const cardsRouter = new Hono<AppEnv>()
   // A new card, at the bottom of Not Started: every card starts there.
   .post("/", requireAuth, requireOAuthSession, newCard, async (c) => {
     const { title } = c.req.valid("json");
-    const status: Status = "not_started";
-    const db = createDb(c.env.PLANNER_DB);
     const teamId = c.get("teamId");
-    const last = await db
-      .select({ sortOrder: max(cards.sortOrder) })
-      .from(cards)
-      .where(inTeam(cards, teamId, eq(cards.status, status)))
-      .get();
-    const sortOrder = (last?.sortOrder ?? -1) + 1;
-    const now = nowSeconds();
-    const [card] = await db
-      .insert(cards)
-      .values(
-        withTeam(teamId, {
-          title,
-          status,
-          sortOrder,
-          createdBy: c.get("userId"),
-          createdAt: now,
-          updatedAt: now,
-        }),
-      )
-      .returning(COLUMNS);
+    const card = await addCard(createDb(c.env.PLANNER_DB), teamId, title, c.get("userId"));
+    afterChange(c);
     return c.json(card, 201);
   })
   .patch("/:id", requireAuth, requireOAuthSession, rename, async (c) => {
@@ -119,8 +92,9 @@ export const cardsRouter = new Hono<AppEnv>()
       .update(cards)
       .set({ title, updatedAt: nowSeconds() })
       .where(inTeam(cards, c.get("teamId"), eq(cards.id, id)))
-      .returning(COLUMNS);
+      .returning(CARD_COLUMNS);
     if (!card) return c.json({ error: "Card not found." }, 404);
+    afterChange(c);
     return c.json(card);
   })
   // Puts a card in a column at `index` (0 is the top), renumbering that column.
@@ -154,6 +128,7 @@ export const cardsRouter = new Hono<AppEnv>()
         .where(inTeam(cards, teamId, eq(cards.id, cardId))),
     );
     await db.batch([first, ...rest]);
+    afterChange(c);
     return c.json({ ok: true });
   })
   // Puts yourself on a card, or takes yourself off: only ever yourself.
@@ -172,6 +147,7 @@ export const cardsRouter = new Hono<AppEnv>()
       .insert(cardMembers)
       .values(withTeam(teamId, { cardId: id, userId: c.get("userId"), addedAt: nowSeconds() }))
       .onConflictDoNothing();
+    afterChange(c);
     return c.json({ ok: true });
   })
   .delete("/:id/members/me", requireAuth, requireOAuthSession, async (c) => {
@@ -187,6 +163,7 @@ export const cardsRouter = new Hono<AppEnv>()
           eq(cardMembers.userId, c.get("userId")),
         ),
       );
+    afterChange(c);
     return c.json({ ok: true });
   })
   // Only the team's admins delete cards.
@@ -199,5 +176,6 @@ export const cardsRouter = new Hono<AppEnv>()
       .where(inTeam(cards, c.get("teamId"), eq(cards.id, id)))
       .returning({ id: cards.id });
     if (!gone) return c.json({ error: "Card not found." }, 404);
+    afterChange(c);
     return c.json({ ok: true });
   });

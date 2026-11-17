@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { DiscordGuild, DiscordUser } from "@g3/discord";
+import { DISCORD_MESSAGE_LIMIT, type DiscordGuild, type DiscordUser } from "@g3/discord";
 import { demoTeamId, parseTeamId } from "@g3/site-config";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -14,8 +14,10 @@ import {
 } from "../db/schema";
 import {
   CHAT_LABELS,
+  type ChatMessageRef,
   chatForTeam,
   chatProvider,
+  editInChannel,
   isChatChannelId,
   postError,
   postToChannel,
@@ -405,7 +407,40 @@ export const internalRouter = new Hono<AppEnv>()
     }
     if (text.length > 40_000) return c.json({ error: "text is too long." }, 400);
     try {
-      await postToChannel(c.env, teamId, chat, channel, text);
+      const message = await postToChannel(c.env, teamId, chat, channel, text);
+      return c.json({ ok: true, message });
+    } catch (err) {
+      return c.json({ error: postError(err) }, 502);
+    }
+  })
+  // A new text for a message the team's bot posted (`editTeamMessage` in @g3/auth: a list an app
+  // keeps up to date). The message is what the post above gave back.
+  .patch("/teams/:id/chat/message", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { message?: unknown; text?: unknown };
+    const teamId = c.req.param("id");
+    const chat = await chatForTeam(c.env, teamId);
+    if (!chat) return c.json({ error: "This team hasn't connected Slack or Discord." }, 404);
+    const message = body.message as Partial<ChatMessageRef> | undefined;
+    if (
+      !message ||
+      (message.provider !== "slack" && message.provider !== "discord") ||
+      typeof message.channel !== "string" ||
+      !isChatChannelId(message.provider, message.channel) ||
+      typeof message.id !== "string" ||
+      !/^[0-9.]{1,40}$/.test(message.id)
+    ) {
+      return c.json({ error: "Say which message: what posting it gave back." }, 400);
+    }
+    if (message.provider !== chat.provider) {
+      return c.json({ error: "The team's chat changed since this was posted." }, 409);
+    }
+    const { text } = body;
+    if (typeof text !== "string" || !text.trim()) {
+      return c.json({ error: "text is required." }, 400);
+    }
+    if (text.length > DISCORD_MESSAGE_LIMIT) return c.json({ error: "text is too long." }, 400);
+    try {
+      await editInChannel(c.env, teamId, chat, message as ChatMessageRef, text);
     } catch (err) {
       return c.json({ error: postError(err) }, 502);
     }

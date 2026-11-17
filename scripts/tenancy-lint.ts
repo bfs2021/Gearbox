@@ -185,6 +185,9 @@ const APPS: App[] = [
     teamTables: {
       cards: "cards",
       cardMembers: "card_members",
+      plannerSettings: "planner_settings",
+      overviews: "overviews",
+      overviewCards: "overview_cards",
     },
   },
 ];

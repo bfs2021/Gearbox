@@ -15,6 +15,7 @@ import { SLACK_BOT_SCOPES } from "@g3/slack";
 import { and, count, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import packageJson from "../package.json";
+import { forwardCommand } from "./commands";
 import { consoleRouter, tellOperators } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { maybeResetDemo, resetDemo } from "./demo";
@@ -500,6 +501,9 @@ const routes = app
     if (!updated) return c.json({ error: "No such team." }, 404);
     return c.json({ ok: true });
   })
+  // A slash command from the team's chat (/gb-add, ...), from G3ID once it knows the team and
+  // who typed it: handed to the app that owns it (src/commands.ts).
+  .post("/internal/teams/:id/commands/:name", forwardCommand)
   // Resets the public demo now (local dev, and operators by hand): the gateway never answers it.
   .post("/internal/demo/reset", async (c) => c.json({ failed: await resetDemo(c.env) }))
   // A visit to the landing page (the page sends it once per tab session; src/visits.ts).

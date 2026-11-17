@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  type ChatCommandReply,
+  type ChatCommandRequest,
   deleteTeamRows,
   exportTeamRows,
   hasMentorAccess,
@@ -17,8 +19,12 @@ import packageJson from "../package.json";
 import { createDb } from "./db";
 import { TEAM_TABLES } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
+import { addCard } from "./lib/cards";
+import { parseTitle } from "./lib/input";
+import { updateOverview } from "./lib/overview";
 import { manifest } from "./manifest";
 import { cardsRouter } from "./routes/cards";
+import { overviewsRouter, settingsRouter } from "./routes/overviews";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -70,6 +76,25 @@ const app = base
     await moveTeamRows(createDb(c.env.PLANNER_DB), from, to, [...TEAM_TABLES]);
     return c.json({ done: true });
   })
+  // /gb-add on the team's chat (CHAT_COMMANDS in @g3/auth), from G3ID through the platform once
+  // they know the team and the member who typed it. The reply is shown only to them.
+  .post("/internal/teams/:teamId/commands/gb-add", async (c) => {
+    const teamId = c.req.param("teamId");
+    const body = (await c.req.json().catch(() => ({}))) as Partial<ChatCommandRequest>;
+    if (typeof body.userId !== "string" || !body.userId) {
+      return c.json({ error: "Say who typed it." }, 400);
+    }
+    const title = parseTitle(body.text);
+    if (!title) {
+      const reply =
+        "Type the card after the command, up to 200 characters: `/gb-add Order more bolts`";
+      return c.json({ reply } satisfies ChatCommandReply);
+    }
+    const db = createDb(c.env.PLANNER_DB);
+    await addCard(db, teamId, title, body.userId);
+    c.executionCtx.waitUntil(updateOverview(db, c.env, teamId));
+    return c.json({ reply: `Added "${title}" to Not Started.` } satisfies ChatCommandReply);
+  })
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),
@@ -82,7 +107,9 @@ const app = base
       canEdit: c.get("sessionType") !== "pin",
     }),
   )
-  .route("/cards", cardsRouter);
+  .route("/cards", cardsRouter)
+  .route("/overviews", overviewsRouter)
+  .route("/settings", settingsRouter);
 
 export type PlannerApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */

@@ -15,6 +15,7 @@ import { signupNameRouter } from "./routes/auth/signup-name";
 import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
 import { demoAuthRouter, demoInternalRouter } from "./routes/demo";
+import { discordRouter } from "./routes/discord";
 import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
 import { adminSignInRouter, teamChatRouter, teamSignInRouter } from "./routes/sign-in-methods";
@@ -63,7 +64,8 @@ const app = base
   .route("/internal", internalRouter)
   .route("/internal", demoInternalRouter)
   .route("/", kioskRouter)
-  .route("/slack", slackRouter);
+  .route("/slack", slackRouter)
+  .route("/discord", discordRouter);
 
 export type G3IDApp = typeof app;
 export default { fetch: withApiPrefix(app.fetch) };
