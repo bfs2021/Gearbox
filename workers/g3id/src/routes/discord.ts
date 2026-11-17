@@ -1,5 +1,5 @@
-import { chatCommand } from "@g3/auth";
 // SPDX-License-Identifier: AGPL-3.0-only
+import { chatCommand } from "@g3/auth";
 import { parseInteraction, pong, privateReply, verifyInteraction } from "@g3/discord";
 import { Hono } from "hono";
 import { runChatCommand } from "../lib/commands";
