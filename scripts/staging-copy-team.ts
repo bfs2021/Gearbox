@@ -122,6 +122,7 @@ const DATABASES: Database[] = [
     alsoTeams: ["starter"],
   },
   { worker: "pit", binding: "PIT_DB" },
+  { worker: "planner", binding: "PLANNER_DB" },
   {
     worker: "schedule",
     binding: "SCHEDULE_DB",

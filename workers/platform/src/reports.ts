@@ -67,6 +67,7 @@ const APP_LABELS: Partial<Record<AppName, string>> = {
   skillTree: "skill tree",
   inventory: "inventory",
   schedule: "schedule",
+  planner: "planner",
   scouting: "scouting",
 };
 

@@ -19,6 +19,7 @@ const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
   attendance: "attendance",
   inventory: "inventory",
   schedule: "schedule",
+  planner: "planner",
 };
 
 /**

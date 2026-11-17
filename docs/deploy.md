@@ -79,7 +79,7 @@ Staging has its own Slack app ("Gearbot Staging"), installed in G3's workspace: 
 1. **The app's settings** (api.slack.com/apps → the staging app):
    - **OAuth & Permissions:** redirect URLs `https://id-dev.g3robotics.com/api/slack/oauth/callback` and `https://dev.g3robotics.com/api/signup/slack/callback`; bot token scopes `commands`, `chat:write`, `im:write`, `im:history`, `users:read`, `users:read.email`, `channels:read`, `groups:read` (`SLACK_BOT_SCOPES` in `@g3/slack`).
    - **Event Subscriptions:** on, request URL `https://id-dev.g3robotics.com/api/slack/events` (staging must be deployed for Slack to verify it); bot events `message.im`, `app_uninstalled`, `tokens_revoked`.
-   - **Slash Commands:** `/signin-staging` → `https://id-dev.g3robotics.com/api/slack/commands/signin`, `/link-staging` → `https://id-dev.g3robotics.com/api/slack/commands/link` (not `/signin` and `/link`, which production's app has in the same workspace).
+   - **Slash Commands:** `/signin-staging` → `https://id-dev.g3robotics.com/api/slack/commands/signin`, `/link-staging` → `https://id-dev.g3robotics.com/api/slack/commands/link` (not `/signin` and `/link`, which production's app has in the same workspace), and Gearbox's own commands with `-staging` on the end ("Slash commands" below).
    - **App Home:** Messages Tab on, and "Allow users to send Slash commands and messages from the messages tab" on, so members can DM it their code.
    - **Manage Distribution:** on, only to try another team's sign-up on staging (it installs the app in that team's workspace).
 2. **Secrets** (from the app's Basic Information page), with `export WRANGLER_HIDE_BANNER=true` first:
@@ -116,6 +116,29 @@ A team uses Slack or Discord, one at a time (`docs/roadmap/discord.md`). One Dis
 5. **Local dev:** set `DISCORD_CLIENT_ID` in `workers/g3id/wrangler.toml`'s `[vars]` (and the platform's, to try sign-up), and `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN` in each Worker's `.dev.vars`.
 
 Admins connect their server on the home's Admin → Integrations (Connect Discord: it takes the admin to Discord to pick a server they manage, and links the admin's Discord to their account). A team on Slack disconnects Slack first. Members then sign in with Discord if they're in the server; someone new waits for an admin's approval, as with Slack. A private channel needs Gearbot's role allowed in it before the bot can post there; the channel picker says so.
+
+## Slash commands
+
+Members use Gearbox's own commands (`CHAT_COMMANDS` in `packages/auth/src/chat-commands.ts`; today `/gb-add`, which adds a card to Planner) in their team's Slack or Discord. Both services send them to ID, which finds the team and the member and hands them to the app through the platform (`workers/g3id/src/lib/commands.ts`). Nothing new on Cloudflare; no new Slack scopes, so no team reconnects.
+
+**Slack**, for each command, in the production app (api.slack.com/apps → Slash Commands → Create New Command):
+- Command `/gb-add`, request URL `https://id.frcgearbox.com/api/slack/commands/gb` (every `gb-` command uses this one address), short description and usage hint from its entry in `CHAT_COMMANDS` (`Add a card to Not Started on your team's Planner board.`, `what needs doing`), "Escape channels, users and links" off.
+- Staging's app ("Slack on staging" above): `/gb-add-staging` → `https://id-dev.g3robotics.com/api/slack/commands/gb`. ID drops the `-staging`.
+
+**Discord**, once per app (production's Gearbot and staging's Gearbot Staging):
+1. **Interactions Endpoint URL** (General Information): `https://id.frcgearbox.com/api/discord/interactions` (staging: `https://id-dev.g3robotics.com/api/discord/interactions`). Set the key below and deploy first: Discord checks the address when you save it.
+2. **Public key** (General Information → Public Key), with `export WRANGLER_HIDE_BANNER=true` first:
+   ```bash
+   cd workers/g3id
+   pnpm exec wrangler secret put DISCORD_PUBLIC_KEY --env production   # or --env staging
+   ```
+3. **Register the commands**, from the repository root, after any change to `CHAT_COMMANDS`:
+   ```bash
+   DISCORD_CLIENT_ID=... DISCORD_BOT_TOKEN=... pnpm discord:commands
+   ```
+   Servers that already have the bot get the commands without being added again (the bot was always added with `applications.commands`).
+
+**A new command:** add it to `CHAT_COMMANDS`, answer `POST /api/internal/teams/:teamId/commands/<name>` in its app (`{ userId, text }` → `{ reply }`), add it to both Slack apps as above, and run `pnpm discord:commands` for both Discord apps.
 
 ## Turnstile (once)
 

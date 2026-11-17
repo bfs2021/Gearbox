@@ -24,6 +24,7 @@ import edgeIcon from "../assets/app-icons/edge.svg";
 import inventoryIcon from "../assets/app-icons/inventory.svg";
 import ordersIcon from "../assets/app-icons/orders.svg";
 import pitIcon from "../assets/app-icons/pit.svg";
+import plannerIcon from "../assets/app-icons/planner.svg";
 import scheduleIcon from "../assets/app-icons/schedule.svg";
 import scoutingIcon from "../assets/app-icons/scouting.svg";
 import shopIcon from "../assets/app-icons/shop.svg";
@@ -56,6 +57,7 @@ const ICONS: Partial<Record<string, string>> = {
   attendance: attendanceIcon,
   inventory: inventoryIcon,
   schedule: scheduleIcon,
+  planner: plannerIcon,
 };
 
 /** A section's icon: its app's, or Getting started's flag ("start", which has no app). */
@@ -118,15 +120,15 @@ function useReader() {
 }
 
 /** The reader's team (the one this browser last opened), or null. */
-function useTeam(): number | null {
+function useTeam(): string | null {
   const [team] = useState(() => rememberedTeam());
   return team;
 }
 
 /** An address on the reader's team, or the platform's "find your team" when it isn't known. */
-function teamHref(team: number | null, app: string, path = "/") {
+function teamHref(team: string | null, app: string, path = "/") {
   if (!team) return `${platformUrl}/team`;
-  const base = teamAppUrl(`frc${team}`, app as AppName);
+  const base = teamAppUrl(team, app as AppName);
   return path === "/" ? `${base}/` : `${base}${path}`;
 }
 

@@ -1,5 +1,34 @@
 # @g3/worker-platform
 
+## 5.0.0
+
+### Major Changes
+
+- 68c4748: FTC teams can sign up: choose FRC or FTC when signing up, and an FTC team's addresses are `ftc<number>.frcgearbox.com` and `ftc<number>-<app>.frcgearbox.com`. Teams that signed up before are asked once, by an admin, whether they're in FRC or FTC; an FTC team moves to its FTC addresses with all its data, and its old links keep working until an FRC team with the same number signs up. Operators can change a team's program from the console, and sign in to it through an FRC or FTC team.
+
+### Patch Changes
+
+- 2ef228f: Operator Access and Member Access are one page: Operator Access lists both when operators opened your team's details and when they opened your member list.
+- Updated dependencies [68c4748]
+- Updated dependencies [68c4748]
+- Updated dependencies [68c4748]
+- Updated dependencies [2ef228f]
+- Updated dependencies [ec6e4a0]
+- Updated dependencies [49935fa]
+- Updated dependencies [d25a687]
+- Updated dependencies [2ef228f]
+  - @g3/worker-pit@4.1.0
+  - @g3/worker-attendance@2.3.0
+  - @g3/worker-edge@2.5.0
+  - @g3/worker-inventory@1.3.0
+  - @g3/worker-orders@2.5.0
+  - @g3/worker-schedule@0.5.0
+  - @g3/worker-scouting@4.1.0
+  - @g3/worker-shop@5.1.0
+  - @g3/worker-skill-tree@2.3.0
+  - @g3/worker-g3id@6.0.0
+  - @g3/worker-portal@2.7.0
+
 ## 4.3.0
 
 ### Minor Changes

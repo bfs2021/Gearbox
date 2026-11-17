@@ -5,6 +5,7 @@ import {
   checkIsolation,
   checkTeamDeletion,
   checkTeamExport,
+  checkTeamMove,
 } from "@g3/testing/isolation";
 import type { TeamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
@@ -78,6 +79,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   // A released part, from the team's own webhook.
   const event = await onshapeEvent(team.teamId, webhookKey, {
     event: "onshape.revision.created",
+    documentId: `doc${tag}`,
     elementType: 0,
     elementId: `el${tag}`,
     partNumber,
@@ -387,4 +389,8 @@ it("exports a team's data for its admins, and only that team's", async () => {
     exportOf: (teamId) => call(`/internal/teams/${teamId}/export`),
   });
   expect(problems).toEqual([]);
+}, 60_000);
+
+it("moves a team's data to its new id when it changes program, and only that team's", async () => {
+  expect(await checkTeamMove({ seed, snapshot })).toEqual([]);
 }, 60_000);

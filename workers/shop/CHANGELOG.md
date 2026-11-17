@@ -1,5 +1,18 @@
 # @g3/worker-shop
 
+## 5.1.0
+
+### Minor Changes
+
+- 68c4748: When a team says it's an FTC team, its data and files move with it to its FTC addresses. Admins of teams that signed up before FTC teams could join are asked once whether their team is in FRC or FTC.
+
+### Patch Changes
+
+- ec6e4a0: Releases from other Onshape documents in your company no longer show up in Shop or get posted to chat: only the document set up on the Admin page counts.
+- 49935fa: Releases from Onshape come in when only a primary webhook signing key is set, and admins see a banner when Onshape's events are unsigned or signed with other keys. The setup docs now say where to make the signing keys in Onshape.
+- d25a687: Shop's Onshape settings call the Company ID field "Classroom/ Company ID", for teams on an Onshape classroom, show saved keys as dots, drop the hints under the boxes, link to a step-by-step setup guide, and say to paste the main assembly's address to fill in the document and assembly IDs.
+- 2ef228f: On the Admin page, removing a subsystem or process is a small trash can, a long name stays readable on a phone, Shop Settings is now called Processes & Subsystems, and its Processes list links to the docs explaining each setting.
+
 ## 5.0.0
 
 ### Major Changes

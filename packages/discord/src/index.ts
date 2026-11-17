@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Discord's REST API, for G3ID (the only worker that talks to Discord). One Discord app serves
 // every team: its bot token is one secret, and a team's connection is just its server (guild) id.
-// Everything here is plain HTTPS: no Gateway connection, so the bot never reads messages.
+// Everything here is plain HTTPS: no Gateway connection, so the bot never reads messages. Slash
+// commands come to it over HTTPS too (Discord's "interactions"; `verifyInteraction` below).
 
 const API = "https://discord.com/api/v10";
 
@@ -24,12 +25,15 @@ export type DiscordApp = {
 
 /** An error Discord answered with: its JSON error code (10004 Unknown Guild, ...) and HTTP status. */
 export class DiscordApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: number,
-    message: string,
-  ) {
+  // Plain fields (not constructor parameter properties), so Node's own TypeScript support can load
+  // this file for scripts (scripts/discord-commands.ts).
+  readonly status: number;
+  readonly code: number;
+
+  constructor(status: number, code: number, message: string) {
     super(`Discord API error ${code || status}: ${message}`);
+    this.status = status;
+    this.code = code;
   }
 
   /** The bot is no longer in the server (removed, or the server is gone). */
@@ -95,14 +99,40 @@ export function splitMessage(text: string, limit = DISCORD_MESSAGE_LIMIT): strin
  * Posts to a channel (a server's channel or a DM). Mentions are never pinged (user text can't
  * reach @everyone) and links get no previews.
  */
-export async function sendMessage(env: DiscordBindings, channelId: string, text: string) {
+export async function sendMessage(
+  env: DiscordBindings,
+  channelId: string,
+  text: string,
+): Promise<string[]> {
+  const ids: string[] = [];
   for (const content of splitMessage(text)) {
-    await call(env, `/channels/${channelId}/messages`, {
+    const message = await call<{ id: string }>(env, `/channels/${channelId}/messages`, {
       method: "POST",
       // 4: SUPPRESS_EMBEDS.
       body: { content, allowed_mentions: { parse: [] }, flags: 4 },
     });
+    ids.push(message.id);
   }
+  return ids;
+}
+
+/**
+ * Replaces the text of a message the bot posted. One message holds 2,000 characters, so a longer
+ * text is refused here rather than cut: keep a message that will be edited short.
+ */
+export async function editMessage(
+  env: DiscordBindings,
+  channelId: string,
+  messageId: string,
+  text: string,
+) {
+  if (text.length > DISCORD_MESSAGE_LIMIT) {
+    throw new Error(`An edited message holds at most ${DISCORD_MESSAGE_LIMIT} characters.`);
+  }
+  await call(env, `/channels/${channelId}/messages/${messageId}`, {
+    method: "PATCH",
+    body: { content: text, allowed_mentions: { parse: [] }, flags: 4 },
+  });
 }
 
 /** A direct message to a Discord user. They must share a server with the bot. */
@@ -306,4 +336,142 @@ export async function exchangeCode(
     },
     guild: token.guild ? { id: token.guild.id, name: token.guild.name } : null,
   };
+}
+
+// ---- Slash commands (interactions) ----
+// Discord sends each use of a slash command to the app's Interactions Endpoint URL as a signed
+// POST, and the answer goes back in the response: no Gateway needed.
+
+/** The public key on the Discord app's General Information page: it checks Discord signed it. */
+export type DiscordInteractionKey = { DISCORD_PUBLIC_KEY: string };
+
+const hexBytes = (hex: string) =>
+  new Uint8Array((hex.match(/.{2}/g) ?? []).map((byte) => Number.parseInt(byte, 16)));
+
+/**
+ * Whether a request to the interactions endpoint came from Discord (its Ed25519 signature over the
+ * timestamp and body). Discord sends a bad one now and then to check that it's refused.
+ */
+export async function verifyInteraction(
+  request: Request,
+  rawBody: string,
+  env: DiscordInteractionKey,
+): Promise<boolean> {
+  const signature = request.headers.get("X-Signature-Ed25519");
+  const timestamp = request.headers.get("X-Signature-Timestamp");
+  if (!signature || !timestamp || !env.DISCORD_PUBLIC_KEY) return false;
+  if (!/^[0-9a-f]{128}$/i.test(signature) || !/^[0-9a-f]{64}$/i.test(env.DISCORD_PUBLIC_KEY)) {
+    return false;
+  }
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      hexBytes(env.DISCORD_PUBLIC_KEY),
+      { name: "Ed25519" },
+      false,
+      ["verify"],
+    );
+    return await crypto.subtle.verify(
+      { name: "Ed25519" },
+      key,
+      hexBytes(signature),
+      new TextEncoder().encode(timestamp + rawBody),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** The kinds of interaction Gearbox handles: Discord's check that the endpoint works, a command. */
+export const INTERACTION = { ping: 1, command: 2 } as const;
+
+/** A slash command as Discord sends it: who typed what, where. */
+export type DiscordCommand = {
+  /** The command without its slash: "gb-add". */
+  name: string;
+  /** Each option's value by name, as text. */
+  options: Record<string, string>;
+  /** The Discord user who typed it. */
+  userId: string;
+  /** The server, which names the team (none in a DM with the bot). */
+  guildId: string | null;
+  channelId: string | null;
+};
+
+type RawInteraction = {
+  type: number;
+  guild_id?: string;
+  channel_id?: string;
+  member?: { user?: { id: string } };
+  user?: { id: string };
+  data?: { name?: string; options?: { name: string; value: unknown }[] };
+};
+
+/** Reads an interaction's body: a ping, a command, or something Gearbox doesn't handle. */
+export function parseInteraction(
+  rawBody: string,
+): { type: "ping" } | { type: "command"; command: DiscordCommand } | { type: "other" } {
+  let body: RawInteraction;
+  try {
+    body = JSON.parse(rawBody) as RawInteraction;
+  } catch {
+    return { type: "other" };
+  }
+  if (body.type === INTERACTION.ping) return { type: "ping" };
+  if (body.type !== INTERACTION.command || !body.data?.name) return { type: "other" };
+  const options: Record<string, string> = {};
+  for (const option of body.data.options ?? []) options[option.name] = String(option.value);
+  return {
+    type: "command",
+    command: {
+      name: body.data.name,
+      options,
+      userId: body.member?.user?.id ?? body.user?.id ?? "",
+      guildId: body.guild_id ?? null,
+      channelId: body.channel_id ?? null,
+    },
+  };
+}
+
+/** The answer to Discord's ping. */
+export const pong = () => ({ type: 1 });
+
+/** An answer to a command that only the person who typed it sees. Mentions never ping. */
+export const privateReply = (text: string) => ({
+  // 4: CHANNEL_MESSAGE_WITH_SOURCE; 64: EPHEMERAL.
+  type: 4,
+  data: {
+    content: text.slice(0, DISCORD_MESSAGE_LIMIT),
+    flags: 64,
+    allowed_mentions: { parse: [] },
+  },
+});
+
+/** A slash command to register with Discord: its name, what it does, and its one text box. */
+export type DiscordCommandDefinition = {
+  name: string;
+  description: string;
+  option?: { name: string; description: string; required: boolean };
+};
+
+/**
+ * Sets the app's global slash commands to exactly these (Discord replaces the whole list). Run
+ * once after a command is added or changed (`pnpm discord:commands`).
+ */
+export async function registerCommands(
+  env: DiscordBindings & Pick<DiscordApp, "DISCORD_CLIENT_ID">,
+  commands: DiscordCommandDefinition[],
+) {
+  await call(env, `/applications/${env.DISCORD_CLIENT_ID}/commands`, {
+    method: "PUT",
+    body: commands.map((command) => ({
+      name: command.name,
+      description: command.description,
+      // 1: CHAT_INPUT (a slash command); 3: a text option.
+      type: 1,
+      // Only in servers: a command names its team by its server.
+      contexts: [0],
+      options: command.option ? [{ type: 3, ...command.option }] : [],
+    })),
+  });
 }

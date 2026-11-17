@@ -1,0 +1,1 @@
+@../../workers/planner/AGENTS.md

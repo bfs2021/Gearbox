@@ -69,10 +69,12 @@ describe("demoBlocked", () => {
     expect(demoBlocked("edge", "POST", "/box/key")).toBe(true);
     expect(demoBlocked("id", "PUT", "/admin/team/ui")).toBe(true);
     expect(demoBlocked("id", "DELETE", "/admin/users/demo-9999-04")).toBe(true);
+    expect(demoBlocked("planner", "POST", "/overviews")).toBe(true);
   });
 
   it("lets ordinary work through", () => {
     expect(demoBlocked("orders", "POST", "/requests")).toBe(false);
+    expect(demoBlocked("planner", "POST", "/cards")).toBe(false);
     expect(demoBlocked("id", "POST", "/admin/users/demo-9999-04/approve")).toBe(false);
   });
 });

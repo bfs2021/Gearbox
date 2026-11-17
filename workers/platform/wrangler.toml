@@ -44,6 +44,10 @@ binding = "SCHEDULE"
 service = "schedule"
 
 [[services]]
+binding = "PLANNER"
+service = "planner"
+
+[[services]]
 binding = "SHOP"
 service = "shop"
 
@@ -103,6 +107,10 @@ service = "pit-production"
 [[env.production.services]]
 binding = "SCHEDULE"
 service = "schedule-production"
+
+[[env.production.services]]
+binding = "PLANNER"
+service = "planner-production"
 
 [[env.production.services]]
 binding = "SHOP"
@@ -179,6 +187,10 @@ service = "pit-staging"
 [[env.staging.services]]
 binding = "SCHEDULE"
 service = "schedule-staging"
+
+[[env.staging.services]]
+binding = "PLANNER"
+service = "planner-staging"
 
 [[env.staging.services]]
 binding = "SHOP"

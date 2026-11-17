@@ -185,6 +185,16 @@ const APPS: App[] = [
       friends: "friends",
     },
   },
+  {
+    dir: "workers/planner",
+    teamTables: {
+      cards: "cards",
+      cardMembers: "card_members",
+      plannerSettings: "planner_settings",
+      overviews: "overviews",
+      overviewCards: "overview_cards",
+    },
+  },
 ];
 
 /** The literal SQL a `sql` template writes: its text, not the `${…}` values put in. */
