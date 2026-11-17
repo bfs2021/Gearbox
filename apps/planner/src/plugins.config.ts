@@ -1,4 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { plansPlugin } from "./plugins/plans";
+import { boardPlugin } from "./plugins/board";
 
-export const plugins = [plansPlugin];
+export const plugins = [boardPlugin];

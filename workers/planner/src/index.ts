@@ -18,6 +18,7 @@ import { createDb } from "./db";
 import { TEAM_TABLES } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { manifest } from "./manifest";
+import { cardsRouter } from "./routes/cards";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -40,7 +41,7 @@ base.use(
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "planner", version: packageJson.version }))
   // Only other workers reach /internal: the gateway never answers it.
-  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // The public demo (roadmap Phase 5): its sample board, after the nightly reset deleted the
   // team's, and the words in it, which the gateway lets demo visitors send.
   .post("/internal/teams/:teamId/demo", async (c) => {
     const teamId = c.req.param("teamId");
@@ -77,11 +78,15 @@ const app = base
       isMentor: hasMentorAccess(c),
       /** G3ID admins. */
       isAdmin: c.get("userIsAdmin"),
+      /** Everyone but a kiosk changes the board. */
+      canEdit: c.get("sessionType") !== "pin",
     }),
-  );
+  )
+  .route("/cards", cardsRouter);
 
 export type PlannerApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */
 export { app };
+export { STATUSES, type Status } from "./db/schema";
 
 export default { fetch: withApiPrefix(app.fetch) };

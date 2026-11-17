@@ -183,7 +183,8 @@ const APPS: App[] = [
   {
     dir: "workers/planner",
     teamTables: {
-      plans: "plans",
+      cards: "cards",
+      cardMembers: "card_members",
     },
   },
 ];

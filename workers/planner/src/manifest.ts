@@ -6,11 +6,11 @@ import packageJson from "../package.json";
 export const manifest = defineManifest({
   slug: "planner",
   name: "Planner",
-  summary: "Plan your team's work.",
+  summary: "A board of cards for your team's work: Not Started, In Progress, Done.",
   roles: ["admin", "mentor", "member"],
   integrations: [],
   availability: "every team",
-  preview: "Planner is new and has no features yet.",
+  preview: "Planner is new: so far it has only its board.",
   version: packageJson.version,
   hooks: { seed: false, delete: true, move: true, export: true, demo: true, storage: false },
   settings: [],

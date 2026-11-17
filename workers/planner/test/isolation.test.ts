@@ -12,22 +12,26 @@ import { call } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { app } from "../src/index";
 
-// Two teams, each with a plan. Every route, called as team A's admin, mentor, student and kiosk
+// Two teams, each with a card with someone on it. Every route, called as team A's admin, mentor, student and kiosk
 // session with team B's ids, must show none of B's and change nothing of B's.
 
 const database = (env as unknown as { PLANNER_DB: D1Database }).PLANNER_DB;
-const TABLES = ["plans"];
+const TABLES = ["cards", "card_members"];
 
 async function seed(team: TeamUsers): Promise<Seeded> {
   const tag = crypto.randomUUID().slice(0, 8);
   const now = Math.floor(Date.now() / 1000);
-  const plan = await database
+  const card = await database
     .prepare(
-      "INSERT INTO plans (team_id, title, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id",
+      "INSERT INTO cards (team_id, title, status, sort_order, created_by, created_at, updated_at) VALUES (?, ?, 'not_started', 0, ?, ?, ?) RETURNING id",
     )
-    .bind(team.teamId, `Plan ${tag}`, team.mentor.id, now, now)
+    .bind(team.teamId, `Card ${tag}`, team.mentor.id, now, now)
     .first<{ id: number }>();
-  return { params: { id: String(plan?.id) }, markers: [`Plan ${tag}`] };
+  await database
+    .prepare("INSERT INTO card_members (team_id, card_id, user_id, added_at) VALUES (?, ?, ?, ?)")
+    .bind(team.teamId, card?.id, team.student.id, now)
+    .run();
+  return { params: { id: String(card?.id) }, markers: [`Card ${tag}`] };
 }
 
 async function snapshot(teamId: string) {
@@ -42,8 +46,18 @@ async function snapshot(teamId: string) {
   return rows;
 }
 
-it("keeps every team's plans to itself", async () => {
-  const { problems } = await checkIsolation({ app, seed, snapshot });
+it("keeps every team's board to itself", async () => {
+  const { problems } = await checkIsolation({
+    app,
+    seed,
+    snapshot,
+    // Team B's ids in bodies that would pass every check but the team's.
+    bodies: () => ({
+      "POST /cards": { title: "Mine" },
+      "PATCH /cards/:id": { title: "Mine" },
+      "PUT /cards/:id/move": { status: "done", index: 0 },
+    }),
+  });
   expect(problems).toEqual([]);
 });
 

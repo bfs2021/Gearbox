@@ -10,6 +10,8 @@ export type AuthUser = {
   isMentor: boolean;
   /** G3ID admins. */
   isAdmin: boolean;
+  /** Everyone but a kiosk changes the board. */
+  canEdit: boolean;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);
