@@ -45,6 +45,8 @@ export const SAFE_TEXT = {
     "District event",
     "Offseason project",
   ],
+  /** A column of Planner's board. */
+  column: ["In Progress", "Testing", "Review", "Waiting on parts", "Blocked"],
   /** A to-do: a card on Planner's board. */
   task: [
     "Order spare bearings",

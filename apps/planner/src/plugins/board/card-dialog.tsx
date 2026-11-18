@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Button, ConfirmButton, Dialog, Field, TextField, inputClass } from "@g3/ui";
-import type { Status } from "@g3/worker-planner";
 import { type FormEvent, useState } from "react";
 import type { BoardCard } from "../../shared/api";
-import { LABELS, STATUSES } from "../../shared/columns";
-import { CardPeople, ToggleMe, usePeople } from "./people";
+import { type Column, laneId } from "../../shared/columns";
+import { AssignPeople, CardPeople, ToggleMe, usePeople } from "./people";
 
-/** A card opened from the board: rename it, move it to another column, or delete it. */
+/**
+ * A card opened from the board: rename it, move it to another column, or delete it. Mentors,
+ * admins and trusted students also put anyone on it or take them off.
+ */
 export function CardDialog({
   card,
+  columns,
   canEdit,
   onClose,
   onRename,
@@ -16,20 +19,23 @@ export function CardDialog({
   onDelete,
 }: {
   card: BoardCard;
+  /** Every column, left to right, with its name. */
+  columns: { column: Column; name: string }[];
   canEdit: boolean;
   onClose: () => void;
   onRename: (title: string) => Promise<boolean>;
-  onMove: (status: Status) => Promise<boolean>;
+  onMove: (column: Column) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
 }) {
   const [title, setTitle] = useState(card.title);
-  const [status, setStatus] = useState<Status>(card.status);
+  const [column, setColumn] = useState<Column>(card.column);
+  const where = columns.find((c) => c.column === card.column)?.name ?? "Card";
   const [busy, setBusy] = useState(false);
-  const { isAdmin } = usePeople();
+  const { isAdmin, canAssign } = usePeople();
 
   if (!canEdit) {
     return (
-      <Dialog title={LABELS[card.status]} onClose={onClose}>
+      <Dialog title={where} onClose={onClose}>
         <div className="space-y-3">
           <p className="text-secondary-900 [overflow-wrap:anywhere]">{card.title}</p>
           <CardPeople card={card} />
@@ -43,7 +49,7 @@ export function CardDialog({
     setBusy(true);
     let ok = true;
     if (title.trim() !== card.title) ok = await onRename(title.trim());
-    if (ok && status !== card.status) ok = await onMove(status);
+    if (ok && column !== card.column) ok = await onMove(column);
     setBusy(false);
     if (ok) onClose();
   }
@@ -72,7 +78,9 @@ export function CardDialog({
             <span className="text-sm font-medium text-secondary-700">On this card</span>
             <ToggleMe card={card} />
           </div>
-          {card.memberIds.length ? (
+          {canAssign ? (
+            <AssignPeople card={card} />
+          ) : card.memberIds.length ? (
             <CardPeople card={card} />
           ) : (
             <p className="text-sm text-secondary-500">Nobody yet.</p>
@@ -81,12 +89,15 @@ export function CardDialog({
         <Field label="Column">
           <select
             className={`${inputClass} max-w-full`}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as Status)}
+            value={laneId(column)}
+            onChange={(e) => {
+              const picked = columns.find((c) => laneId(c.column) === e.target.value);
+              if (picked) setColumn(picked.column);
+            }}
           >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {LABELS[s]}
+            {columns.map((c) => (
+              <option key={laneId(c.column)} value={laneId(c.column)}>
+                {c.name}
               </option>
             ))}
           </select>

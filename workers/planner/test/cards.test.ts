@@ -3,19 +3,24 @@ import { admin, kioskAdmin, mentor, otherStudent, student } from "@g3/testing/us
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
-type Card = { id: number; title: string; status: string; sortOrder: number; memberIds: string[] };
+type Column = "not_started" | "done" | number;
+type Card = { id: number; title: string; column: Column; sortOrder: number; memberIds: string[] };
 
-const add = (title: string, status?: string) =>
-  jsonAs<Card>(student, "/cards", { method: "POST", body: { title, status } }, 201);
+const add = (title: string, column?: Column) =>
+  jsonAs<Card>(student, "/cards", { method: "POST", body: { title, column } }, 201);
 
-const move = (card: Card, status: string, index: number) =>
-  callAs(student, `/cards/${card.id}/move`, { method: "PUT", body: { status, index } });
+const move = (card: Card, column: unknown, index: number) =>
+  callAs(student, `/cards/${card.id}/move`, { method: "PUT", body: { column, index } });
+
+/** A middle column of the board, made by a mentor. */
+const middle = async (name: string) =>
+  (await jsonAs<{ id: number }>(mentor, "/columns", { method: "POST", body: { name } }, 201)).id;
 
 /** The titles in a column, top first, of the cards made in this test (by tag). */
-async function column(status: string, tag: string) {
+async function column(at: Column, tag: string) {
   const cards = (await jsonAs(student, "/cards")) as Card[];
   return cards
-    .filter((c) => c.status === status && c.title.includes(tag))
+    .filter((c) => c.column === at && c.title.includes(tag))
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((c) => c.title.replace(` ${tag}`, ""));
 }
@@ -23,15 +28,16 @@ async function column(status: string, tag: string) {
 describe("the board", () => {
   it("adds cards to the bottom of Not Started, whatever column is asked for", async () => {
     const tag = crypto.randomUUID().slice(0, 8);
-    expect((await add(`A ${tag}`)).status).toBe("not_started");
+    expect((await add(`A ${tag}`)).column).toBe("not_started");
     await add(`B ${tag}`);
-    expect((await add(`C ${tag}`, "done")).status).toBe("not_started");
+    expect((await add(`C ${tag}`, "done")).column).toBe("not_started");
     expect(await column("not_started", tag)).toEqual(["A", "B", "C"]);
     expect(await column("done", tag)).toEqual([]);
   });
 
   it("moves a card to another column, or within one, at the place it's dropped", async () => {
     const tag = crypto.randomUUID().slice(0, 8);
+    const doing = await middle(`Doing ${tag}`);
     const a = await add(`A ${tag}`);
     await add(`B ${tag}`);
     const c = await add(`C ${tag}`);
@@ -39,17 +45,21 @@ describe("the board", () => {
     expect(await column("not_started", tag)).toEqual(["C", "A", "B"]);
 
     // Another member sees the same board.
-    expect((await move(a, "in_progress", 0)).status).toBe(200);
+    expect((await move(a, doing, 0)).status).toBe(200);
     const theirs = (await jsonAs(otherStudent, "/cards")) as Card[];
-    expect(theirs.find((card) => card.id === a.id)?.status).toBe("in_progress");
+    expect(theirs.find((card) => card.id === a.id)?.column).toBe(doing);
     expect(await column("not_started", tag)).toEqual(["C", "B"]);
 
     // Past the end goes to the bottom.
-    expect((await move(c, "in_progress", 99)).status).toBe(200);
-    expect(await column("in_progress", tag)).toEqual(["A", "C"]);
+    expect((await move(c, doing, 99)).status).toBe(200);
+    expect(await column(doing, tag)).toEqual(["A", "C"]);
+    expect((await move(c, "done", 0)).status).toBe(200);
+    expect(await column("done", tag)).toEqual(["C"]);
 
     expect((await move(c, "nowhere", 0)).status).toBe(400);
     expect((await move(c, "done", -1)).status).toBe(400);
+    // A column that isn't there (or isn't the team's).
+    expect((await move(c, 999999, 0)).status).toBe(404);
   });
 
   it("renames cards, and lets only admins delete them", async () => {

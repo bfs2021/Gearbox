@@ -189,10 +189,12 @@ const APPS: App[] = [
     dir: "workers/planner",
     teamTables: {
       cards: "cards",
+      boardColumns: "board_columns",
       cardMembers: "card_members",
       plannerSettings: "planner_settings",
       overviews: "overviews",
       overviewCards: "overview_cards",
+      trustedStudents: "trusted_students",
     },
   },
 ];

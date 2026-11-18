@@ -21,6 +21,7 @@ A person can be both a mentor and an admin. An admin who isn't a mentor is treat
 Some apps let you trust particular members with more:
 
 - **Orders:** trusted students edit the parts catalog, like mentors. Set on Orders' Admin page.
+- **Planner:** trusted students put anyone on a card or take them off, like mentors. Set on Planner's Admin page.
 - **Schedule:** trusted members edit schedules. Set on Schedule's Admin page.
 - **Scouting:** strategy leads run Scouting like its admins, and the service crew gets the robot's service tickets. Set on Scouting's Admin page.
 

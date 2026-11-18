@@ -3,35 +3,40 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { focusRing } from "@g3/ui";
-import type { Status } from "@g3/worker-planner";
 import type { BoardCard } from "../../shared/api";
 import { CardActions, CardPeople } from "./people";
 
+/** The width every column has side by side; on a phone they're stacked, full width. */
+export const COLUMN_WIDTH = "md:w-72 md:shrink-0";
+
 /** One column: its cards, in order. */
 export function BoardColumn({
-  status,
+  lane,
   label,
   cards,
   canEdit,
   onOpen,
 }: {
-  status: Status;
+  /** Its drag and drop id (`laneId`). */
+  lane: string;
   label: string;
   cards: BoardCard[];
   canEdit: boolean;
   onOpen: (card: BoardCard) => void;
 }) {
   // The column itself takes a drop too, so an empty one can be dropped into.
-  const { setNodeRef, isOver } = useDroppable({ id: status, disabled: !canEdit });
+  const { setNodeRef, isOver } = useDroppable({ id: lane, disabled: !canEdit });
   return (
     <section
       aria-label={label}
-      className="flex min-w-0 flex-col rounded-xl border border-line bg-inset p-3"
+      className={`flex min-w-0 flex-col rounded-xl border border-line bg-inset p-3 ${COLUMN_WIDTH}`}
     >
-      <h2 className="flex items-center justify-between px-1 pb-2 text-sm font-semibold text-secondary-700">
-        {label}
-        <span className="text-xs font-normal text-secondary-500">{cards.length}</span>
-      </h2>
+      <div className="flex items-center justify-between gap-2 px-1 pb-2">
+        <h2 className="min-w-0 truncate text-sm font-semibold text-secondary-700" title={label}>
+          {label}
+        </h2>
+        <span className="shrink-0 text-xs text-secondary-500">{cards.length}</span>
+      </div>
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <ul
           ref={setNodeRef}

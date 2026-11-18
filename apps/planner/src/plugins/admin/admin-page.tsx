@@ -14,8 +14,13 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
+import { ColumnsCard } from "./columns-card";
+import { TrustedCard } from "./trusted-card";
 
-/** Planner's settings, for mentors and admins: where meeting overviews go. */
+/**
+ * Planner's settings, for mentors and admins: the columns, where meeting overviews go, and the
+ * trusted students.
+ */
 export function AdminPage() {
   const { isMentor } = useAuthUser();
   const chat = chatName(useTeamChat());
@@ -65,12 +70,13 @@ export function AdminPage() {
 
   return (
     <Page title="Admin">
+      <ColumnsCard />
       <Card title="Meeting overviews">
         <div className="space-y-4">
           <p className="text-sm text-secondary-500">
-            <strong>Send meeting overview</strong> on the board posts what's Not Started and In
-            Progress to this {chat} channel. The message updates as cards change, and crosses off
-            what gets done.
+            <strong>Send meeting overview</strong> on the board posts what's Not Started and Started
+            to this {chat} channel. The message updates as cards change, and crosses off what gets
+            finished.
           </p>
           <div className="space-y-1">
             <label
@@ -102,6 +108,7 @@ export function AdminPage() {
           has to be linked to Gearbox.
         </p>
       </Card>
+      <TrustedCard />
     </Page>
   );
 }

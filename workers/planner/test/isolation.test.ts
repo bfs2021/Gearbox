@@ -12,21 +12,35 @@ import { call } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { app } from "../src/index";
 
-// Two teams, each with a card with someone on it, an overview channel and an overview listing the
-// card. Every route, called as team A's admin, mentor, student and kiosk
+// Two teams, each with a card with someone on it, an overview channel, an overview listing the
+// card and a trusted student. Every route, called as team A's admin, mentor, student and kiosk
 // session with team B's ids, must show none of B's and change nothing of B's.
 
 const database = (env as unknown as { PLANNER_DB: D1Database }).PLANNER_DB;
-const TABLES = ["cards", "card_members", "planner_settings", "overviews", "overview_cards"];
+const TABLES = [
+  "board_columns",
+  "cards",
+  "card_members",
+  "planner_settings",
+  "overviews",
+  "overview_cards",
+  "trusted_students",
+];
 
 async function seed(team: TeamUsers): Promise<Seeded> {
   const tag = crypto.randomUUID().slice(0, 8);
   const now = Math.floor(Date.now() / 1000);
+  const column = await database
+    .prepare(
+      "INSERT INTO board_columns (team_id, name, sort_order, created_by, created_at) VALUES (?, ?, 0, ?, ?) RETURNING id",
+    )
+    .bind(team.teamId, `Column ${tag}`, team.mentor.id, now)
+    .first<{ id: number }>();
   const card = await database
     .prepare(
-      "INSERT INTO cards (team_id, title, status, sort_order, created_by, created_at, updated_at) VALUES (?, ?, 'not_started', 0, ?, ?, ?) RETURNING id",
+      "INSERT INTO cards (team_id, title, status, column_id, sort_order, created_by, created_at, updated_at) VALUES (?, ?, 'in_progress', ?, 0, ?, ?, ?) RETURNING id",
     )
-    .bind(team.teamId, `Card ${tag}`, team.mentor.id, now, now)
+    .bind(team.teamId, `Card ${tag}`, column?.id, team.mentor.id, now, now)
     .first<{ id: number }>();
   await database
     .prepare("INSERT INTO card_members (team_id, card_id, user_id, added_at) VALUES (?, ?, ?, ?)")
@@ -48,7 +62,22 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     .prepare("INSERT INTO overview_cards (team_id, overview_id, card_id) VALUES (?, ?, ?)")
     .bind(team.teamId, overview?.id, card?.id)
     .run();
-  return { params: { id: String(card?.id) }, markers: [`Card ${tag}`] };
+  await database
+    .prepare(
+      "INSERT INTO trusted_students (team_id, user_id, added_by, added_at) VALUES (?, ?, ?, ?)",
+    )
+    .bind(team.teamId, team.student.id, team.mentor.id, now)
+    .run();
+  return {
+    // /cards/:id is the card, /columns/:id the column, :userId the team's student (on the card,
+    // and trusted).
+    params: (path, name) =>
+      name === "userId"
+        ? team.student.id
+        : String(path.startsWith("/columns") ? column?.id : card?.id),
+    markers: [`Card ${tag}`, `Column ${tag}`],
+    data: { columnId: column?.id },
+  };
 }
 
 async function snapshot(teamId: string) {
@@ -69,10 +98,13 @@ it("keeps every team's board to itself", async () => {
     seed,
     snapshot,
     // Team B's ids in bodies that would pass every check but the team's.
-    bodies: () => ({
+    bodies: (b) => ({
       "POST /cards": { title: "Mine" },
       "PATCH /cards/:id": { title: "Mine" },
-      "PUT /cards/:id/move": { status: "done", index: 0 },
+      "PUT /cards/:id/move": { column: (b.data as { columnId: number }).columnId, index: 0 },
+      "POST /columns": { name: "Mine" },
+      "PATCH /columns/:id": { name: "Mine" },
+      "PUT /columns/order": { ids: [(b.data as { columnId: number }).columnId] },
       "PUT /settings": { overviewChannel: "C0MINE" },
     }),
   });

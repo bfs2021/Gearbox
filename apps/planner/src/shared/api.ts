@@ -28,5 +28,6 @@ export async function getErrorMessage(res: {
   return `Request failed (${res.status}).`;
 }
 
-export type BoardCard = InferResponseType<(typeof api.cards)["$get"], 200>[number];
+export type BoardData = InferResponseType<(typeof api.board)["$get"], 200>;
+export type BoardCard = BoardData["cards"][number];
 export type Person = InferResponseType<(typeof api.cards.people)["$get"], 200>[number];
