@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { STATUSES, type Status } from "../db/schema";
-
 /** The longest card title. */
 export const MAX_TITLE = 200;
 
@@ -16,10 +14,6 @@ export function parseTitle(value: unknown): string | null {
   const trimmed = value.trim();
   return trimmed && trimmed.length <= MAX_TITLE ? trimmed : null;
 }
-
-/** One of the board's columns, or null. */
-export const parseStatus = (value: unknown): Status | null =>
-  STATUSES.includes(value as Status) ? (value as Status) : null;
 
 /** Now, in Unix seconds. */
 export const nowSeconds = () => Math.floor(Date.now() / 1000);

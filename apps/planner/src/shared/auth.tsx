@@ -12,6 +12,8 @@ export type AuthUser = {
   isAdmin: boolean;
   /** Everyone but a kiosk changes the board. */
   canEdit: boolean;
+  /** Mentors, admins and trusted students put anyone on a card or take them off. */
+  canAssign: boolean;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);

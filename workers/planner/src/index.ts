@@ -20,11 +20,15 @@ import { createDb } from "./db";
 import { TEAM_TABLES } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { addCard } from "./lib/cards";
+import { listColumns, seedColumns } from "./lib/columns";
 import { parseTitle } from "./lib/input";
 import { updateOverview } from "./lib/overview";
+import { canAssign } from "./lib/trusted";
 import { manifest } from "./manifest";
-import { cardsRouter } from "./routes/cards";
+import { boardCards, cardsRouter } from "./routes/cards";
+import { columnsRouter } from "./routes/columns";
 import { overviewsRouter, settingsRouter } from "./routes/overviews";
+import { trustedRouter } from "./routes/trusted";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -55,6 +59,12 @@ const app = base
     return c.json(await loadDemo(createDb(c.env.PLANNER_DB), teamId));
   })
   .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
+  // The team switched Planner on (the platform's app library): it starts with an In Progress
+  // column, unless it already has columns. Safe to run again.
+  .post("/internal/teams/:teamId/seed", async (c) => {
+    await seedColumns(createDb(c.env.PLANNER_DB), c.req.param("teamId"));
+    return c.json({ ok: true });
+  })
   // The team's data, for its admins to download before switching the app off (the platform's app
   // library).
   .get("/internal/teams/:teamId/export", async (c) => {
@@ -95,7 +105,7 @@ const app = base
     c.executionCtx.waitUntil(updateOverview(db, c.env, teamId));
     return c.json({ reply: `Added "${title}" to Not Started.` } satisfies ChatCommandReply);
   })
-  .get("/me", requireAuth, (c) =>
+  .get("/me", requireAuth, async (c) =>
     c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
@@ -105,15 +115,28 @@ const app = base
       isAdmin: c.get("userIsAdmin"),
       /** Everyone but a kiosk changes the board. */
       canEdit: c.get("sessionType") !== "pin",
+      /** Mentors, admins and trusted students put anyone on a card or take them off. */
+      canAssign: await canAssign(c),
     }),
   )
+  // The whole board in one answer, so a page's poll never sees columns and cards out of step.
+  .get("/board", requireAuth, async (c) => {
+    const db = createDb(c.env.PLANNER_DB);
+    const teamId = c.get("teamId");
+    const [columns, cards] = await Promise.all([listColumns(db, teamId), boardCards(db, teamId)]);
+    return c.json({ columns, cards });
+  })
   .route("/cards", cardsRouter)
+  .route("/columns", columnsRouter)
   .route("/overviews", overviewsRouter)
-  .route("/settings", settingsRouter);
+  .route("/settings", settingsRouter)
+  .route("/trusted", trustedRouter);
 
 export type PlannerApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */
 export { app };
-export { STATUSES, type Status } from "./db/schema";
+// Types only: a Worker's main module may export nothing but handlers (limits: `src/limits.ts`).
+export type { Status } from "./db/schema";
+export type { Column } from "./lib/columns";
 
 export default { fetch: withApiPrefix(app.fetch) };

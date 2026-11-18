@@ -3,23 +3,35 @@ import { withTeam } from "@g3/auth";
 import { DEMO_PEOPLE, type DemoPerson, vocabularyOf } from "@g3/demo";
 import type { Db } from "./db";
 import { type Status, cardMembers, cards } from "./db/schema";
+import { addColumn } from "./lib/columns";
 
-// The public demo's Planner (roadmap 5.3), loaded after its nightly reset: a board with a few
-// cards in each column, and people on the ones under way.
+// The public demo's Planner (roadmap 5.3), loaded after its nightly reset: a board with two
+// middle columns, a few cards in each column, and people on the ones under way.
 
-const BOARD: Record<Status, string[]> = {
-  not_started: ["Order spare bearings", "Practice autos", "Write the build log"],
-  in_progress: ["Wire the drivetrain", "Update the CAD"],
-  done: ["Pick up the field elements", "Inventory the pit cart"],
-};
+const NOT_STARTED = ["Order spare bearings", "Practice autos", "Write the build log"];
+const MIDDLE: { name: string; cards: string[] }[] = [
+  { name: "In Progress", cards: ["Wire the drivetrain", "Update the CAD"] },
+  { name: "Testing", cards: ["Test the new intake"] },
+];
+const DONE = ["Pick up the field elements", "Inventory the pit cart"];
 
 export async function loadDemo(db: Db, teamId: string) {
   const seconds = Math.floor(Date.now() / 1000);
   const mentor = DEMO_PEOPLE[1] as DemoPerson;
-  const rows = Object.entries(BOARD).flatMap(([status, titles]) =>
+  const lanes: { status: Status; columnId: number | null; titles: string[] }[] = [
+    { status: "not_started", columnId: null, titles: NOT_STARTED },
+  ];
+  for (const column of MIDDLE) {
+    const made = await addColumn(db, teamId, column.name, null);
+    lanes.push({ status: "in_progress", columnId: made.id, titles: column.cards });
+  }
+  lanes.push({ status: "done", columnId: null, titles: DONE });
+
+  const rows = lanes.flatMap(({ status, columnId, titles }) =>
     titles.map((title, sortOrder) => ({
       title,
-      status: status as Status,
+      status,
+      columnId,
       sortOrder,
       createdBy: mentor.id,
       createdAt: seconds,
@@ -30,7 +42,7 @@ export async function loadDemo(db: Db, teamId: string) {
     .insert(cards)
     .values(withTeam(teamId, rows))
     .returning({ id: cards.id, status: cards.status });
-  // Two people on each card in progress, one on each done.
+  // Two people on each card under way, one on each done.
   const people = made.flatMap((card, i) =>
     card.status === "not_started"
       ? []
@@ -45,4 +57,4 @@ export async function loadDemo(db: Db, teamId: string) {
 }
 
 /** The words in the sample data, which demo visitors may send back. */
-export const demoWords = (): string[] => vocabularyOf(BOARD);
+export const demoWords = (): string[] => vocabularyOf(NOT_STARTED, MIDDLE, DONE);

@@ -9,7 +9,7 @@ import {
 } from "@g3/auth";
 import { teamAppUrl } from "@g3/site-config";
 import { plainChatText } from "@g3/slack";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import {
   type Status,
@@ -19,12 +19,13 @@ import {
   overviews,
   plannerSettings,
 } from "../db/schema";
+import { listColumns } from "./columns";
 import { nowSeconds } from "./input";
 
 // Meeting overviews: a message on the team's chat (Slack or Discord, through G3ID) listing what's
-// Not Started and In Progress. Only the team's latest overview is kept up to date: after any change
-// to the board, `updateOverview` rewrites it. Every card that has been on it stays: one moved to
-// Done shows crossed off, one deleted goes. The text is Gearbox's chat format (@g3/slack's toSlack
+// Not Started and Started (the cards in the board's middle columns). Only the team's latest overview is kept up to
+// date: after any change to the board, `updateOverview` rewrites it. Every card that has been on it
+// stays: one moved to Done shows crossed off in the list it was last in, one deleted goes. The text is Gearbox's chat format (@g3/slack's toSlack
 // turns it into Slack's), kept under one Discord message, since a message that's edited can't be
 // split.
 
@@ -35,49 +36,73 @@ const LIMIT = 1900;
 
 export type OverviewCard = { id: number; title: string; status: Status; names: string[] };
 
-const SECTIONS: { status: Status; title: string }[] = [
-  { status: "not_started", title: "Not Started" },
-  { status: "in_progress", title: "In Progress" },
-  { status: "done", title: "Done" },
+/** The overview's lists: a card in Done is shown in the one it was last in. */
+export type Section = Exclude<Status, "done">;
+
+const SECTIONS: { section: Section; title: string }[] = [
+  { section: "not_started", title: "Not Started" },
+  { section: "in_progress", title: "Started" },
 ];
 
 /**
- * An overview's text: the cards in Not Started and In Progress, and those of `onOverview` now in
- * Done, crossed off. Cards come in board order. A list too long for one message ends its longest
- * sections with "…and N more".
+ * An overview's text: Not Started and Started (In Progress), each with its cards in board order,
+ * then the cards of `onOverview` finished since it was posted, crossed off in the list they were
+ * last in. A list too long for one message ends its longest sections with "…and N more".
  */
+/** A time zone a browser sent, if it's one Gearbox knows; else null. */
+export function parseTimeZone(value: unknown): string | null {
+  if (typeof value !== "string" || !value || value.length > 64) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** The day an overview was sent, in its sender's time zone: "Tuesday, November 17, 2026". */
+export function overviewDate(postedAt: number, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(postedAt * 1000));
+}
+
 export function overviewText(
   board: OverviewCard[],
-  onOverview: ReadonlySet<number>,
+  onOverview: ReadonlyMap<number, Section>,
   boardUrl: string,
+  /** When it was sent, as `overviewDate` gives it. */
+  date: string,
 ): string {
   const line = (card: OverviewCard) => {
     const title = plainChatText(card.title) || "Untitled";
     const who = card.names.length ? ` (${card.names.map(plainChatText).join(", ")})` : "";
     return card.status === "done" ? `• ~~${title}~~${who}` : `• ${title}${who}`;
   };
-  const lists = SECTIONS.map(({ status, title }) => ({
-    status,
+  const lists = SECTIONS.map(({ section, title }) => ({
     title,
-    lines: board
-      .filter((card) => card.status === status && (status !== "done" || onOverview.has(card.id)))
-      .map(line),
+    lines: [
+      ...board.filter((card) => card.status === section),
+      ...board.filter((card) => card.status === "done" && onOverview.get(card.id) === section),
+    ].map(line),
     hidden: 0,
   }));
 
   const render = () =>
     [
-      "**📋 Meeting overview**",
-      ...lists
-        .filter((list) => list.status !== "done" || list.lines.length + list.hidden > 0)
-        .flatMap((list) => [
-          "",
-          `**${list.title}**`,
-          ...(list.lines.length || list.hidden ? list.lines : ["Nothing here."]),
-          ...(list.hidden ? [`…and ${list.hidden} more`] : []),
-        ]),
+      `**📋 Meeting overview · ${date}**`,
+      ...lists.flatMap((list) => [
+        "",
+        `**${list.title}**`,
+        ...(list.lines.length || list.hidden ? list.lines : ["Nothing here."]),
+        ...(list.hidden ? [`…and ${list.hidden} more`] : []),
+      ]),
       "",
-      `[Open the board](${boardUrl}) · Add a card with \`/gb-add\``,
+      `[Open the board](${boardUrl}) · Add a card with \`/gb-add\` in the channel`,
     ].join("\n");
 
   let text = render();
@@ -91,11 +116,14 @@ export function overviewText(
   return text;
 }
 
-/** The board as the overview shows it: every card with the names of who's on it. */
+/**
+ * The board as the overview shows it: every card with the names of who's on it, in board order
+ * (the middle columns left to right, each top to bottom).
+ */
 async function boardFor(db: Db, env: Env, teamId: string): Promise<OverviewCard[]> {
-  const [rows, members, people] = await Promise.all([
+  const [rows, members, people, columns] = await Promise.all([
     db
-      .select({ id: cards.id, title: cards.title, status: cards.status })
+      .select({ id: cards.id, title: cards.title, status: cards.status, columnId: cards.columnId })
       .from(cards)
       .where(inTeam(cards, teamId))
       .orderBy(asc(cards.sortOrder), asc(cards.id))
@@ -107,9 +135,19 @@ async function boardFor(db: Db, env: Env, teamId: string): Promise<OverviewCard[
       .orderBy(asc(cardMembers.addedAt))
       .all(),
     activeMembers(env, teamId).catch(() => null),
+    listColumns(db, teamId),
   ]);
   const names = new Map((people ?? []).map((m) => [m.id, m.displayName]));
-  return rows.map((card) => ({
+  const place = new Map(columns.map((col, i) => [col.id, i]));
+  const ordered = rows
+    .map((card, i) => ({ card, i }))
+    .sort(
+      (a, b) =>
+        (place.get(a.card.columnId ?? -1) ?? -1) - (place.get(b.card.columnId ?? -1) ?? -1) ||
+        a.i - b.i,
+    )
+    .map(({ card }) => card);
+  return ordered.map(({ columnId: _, ...card }) => ({
     ...card,
     names: members
       .filter((m) => m.cardId === card.id && names.has(m.userId))
@@ -117,7 +155,7 @@ async function boardFor(db: Db, env: Env, teamId: string): Promise<OverviewCard[
   }));
 }
 
-/** Records the cards now in Not Started or In Progress as being on an overview. */
+/** Records the cards now in Not Started or In Progress as on an overview, and in which list. */
 async function remember(db: Db, teamId: string, overviewId: number, board: OverviewCard[]) {
   const open = board.filter((card) => card.status !== "done");
   if (!open.length) return;
@@ -126,20 +164,23 @@ async function remember(db: Db, teamId: string, overviewId: number, board: Overv
     .values(
       withTeam(
         teamId,
-        open.map((card) => ({ overviewId, cardId: card.id })),
+        open.map((card) => ({ overviewId, cardId: card.id, section: card.status as Section })),
       ),
     )
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: [overviewCards.overviewId, overviewCards.cardId],
+      set: { section: sql`excluded.section` },
+    });
 }
 
-/** The cards that have been on an overview. */
+/** The cards that have been on an overview, and the list each was last in. */
 async function cardsOn(db: Db, teamId: string, overviewId: number) {
   const rows = await db
-    .select({ cardId: overviewCards.cardId })
+    .select({ cardId: overviewCards.cardId, section: overviewCards.section })
     .from(overviewCards)
     .where(inTeam(overviewCards, teamId, eq(overviewCards.overviewId, overviewId)))
     .all();
-  return new Set(rows.map((r) => r.cardId));
+  return new Map(rows.map((r) => [r.cardId, r.section]));
 }
 
 /** The channel the team's overviews go to, or null until an admin picks one. */
@@ -158,17 +199,26 @@ export async function sendOverview(
   env: Env,
   teamId: string,
   userId: string,
+  /** The sender's time zone, for the date (`parseTimeZone`). */
+  timeZone: string,
 ): Promise<{ ok: true; postedAt: number } | { ok: false; error: string }> {
   const channel = await overviewChannel(db, teamId);
   if (!channel)
     return { ok: false, error: "Choose a channel for overviews on Planner's Admin page." };
   const board = await boardFor(db, env, teamId);
-  const open = new Set(board.filter((c) => c.status !== "done").map((c) => c.id));
-  const text = overviewText(board, open, teamAppUrl(teamId, "planner"));
+  const open = new Map(
+    board.flatMap((c) => (c.status === "done" ? [] : [[c.id, c.status as Section] as const])),
+  );
+  const postedAt = nowSeconds();
+  const text = overviewText(
+    board,
+    open,
+    teamAppUrl(teamId, "planner"),
+    overviewDate(postedAt, timeZone),
+  );
   const posted = await postTeamMessage(env, teamId, channel, text);
   if (!posted.ok) return { ok: false, error: chatError(posted.error) };
 
-  const postedAt = nowSeconds();
   const [overview] = await db
     .insert(overviews)
     .values(
@@ -179,6 +229,7 @@ export async function sendOverview(
         lastText: text,
         postedBy: userId,
         postedAt,
+        timeZone,
       }),
     )
     .returning({ id: overviews.id });
@@ -206,6 +257,8 @@ export async function updateOverview(db: Db, env: Env, teamId: string): Promise<
       board,
       await cardsOn(db, teamId, latest.id),
       teamAppUrl(teamId, "planner"),
+      // Always the day it was sent, however long it keeps updating.
+      overviewDate(latest.postedAt, parseTimeZone(latest.timeZone) ?? "UTC"),
     );
     if (text === latest.lastText) return;
     const message: TeamMessageRef = {

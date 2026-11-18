@@ -12,7 +12,7 @@ export const manifest = defineManifest({
   availability: "every team",
   preview: "Planner is new: so far it has only its board.",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, move: true, export: true, demo: true, storage: false },
+  hooks: { seed: true, delete: true, move: true, export: true, demo: true, storage: false },
   settings: [
     {
       key: "overviewChannel",

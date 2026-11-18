@@ -6,7 +6,7 @@ import { validator } from "hono/validator";
 import { createDb } from "../db";
 import { overviews, plannerSettings } from "../db/schema";
 import { nowSeconds } from "../lib/input";
-import { overviewChannel, sendOverview } from "../lib/overview";
+import { overviewChannel, parseTimeZone, sendOverview } from "../lib/overview";
 import type { AppEnv } from "../types";
 
 // Meeting overviews (src/lib/overview.ts): mentors and admins choose the channel and send one;
@@ -51,6 +51,12 @@ export const settingsRouter = new Hono<AppEnv>()
     return c.json({ overviewChannel: channel });
   });
 
+/** A send's body: the sender's time zone, if their browser said (anything else is ignored). */
+const sendBody = validator("json", (value): { timeZone?: string } => {
+  const timeZone = (value as { timeZone?: unknown } | null)?.timeZone;
+  return typeof timeZone === "string" ? { timeZone } : {};
+});
+
 export const overviewsRouter = new Hono<AppEnv>()
   // When the team's last overview went, if it ever sent one.
   .get("/latest", requireAuth, async (c) => {
@@ -63,12 +69,15 @@ export const overviewsRouter = new Hono<AppEnv>()
       .get();
     return c.json({ postedAt: latest?.postedAt ?? null });
   })
-  .post("/", requireMentor, async (c) => {
+  // `{ timeZone }`: the sender's, from their browser, for the date in the heading (UTC without).
+  .post("/", requireMentor, sendBody, async (c) => {
+    const body = c.req.valid("json");
     const sent = await sendOverview(
       createDb(c.env.PLANNER_DB),
       c.env,
       c.get("teamId"),
       c.get("userId"),
+      parseTimeZone(body.timeZone) ?? "UTC",
     );
     if (!sent.ok) return c.json({ error: sent.error }, 409);
     return c.json({ postedAt: sent.postedAt });

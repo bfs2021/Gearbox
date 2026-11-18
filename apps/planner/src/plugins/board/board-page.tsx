@@ -15,43 +15,56 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { ConfirmQuestion, Dialog, ErrorBanner, Page, PageLoading } from "@g3/ui";
-import type { Status } from "@g3/worker-planner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type BoardCard, api, getErrorMessage } from "../../shared/api";
+import { type BoardCard, type BoardData, api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { LABELS, STATUSES } from "../../shared/columns";
+import {
+  type Column,
+  type MiddleColumn,
+  allColumns,
+  columnName,
+  columnOfLane,
+  laneId,
+} from "../../shared/columns";
 import { AddCard } from "./add-card";
 import { CardDialog } from "./card-dialog";
 import { BoardColumn, CardFace } from "./column";
+import { NoMiddleColumns } from "./no-columns";
 import { type People, PeopleContext } from "./people";
 import { SendOverview } from "./send-overview";
 
-// The team's board: cards in three columns, dragged between and within them. Everyone's board
-// follows the others' by asking for the cards every few seconds.
+// The team's board: Not Started, the team's own middle columns, and Done. Cards are dragged
+// between and within them. The middle columns are arranged on the Admin page.
+// Everyone's board follows the others' by asking for it every few seconds.
 
 /** How often the board asks for everyone's changes. */
 const POLL_MS = 5000;
 
-export type Columns = Record<Status, BoardCard[]>;
+/** The board on screen: the middle columns, and each column's cards by its `laneId`, top first. */
+type Board = { middle: MiddleColumn[]; lanes: Record<string, BoardCard[]> };
 
-/** The cards in their columns, top first. */
-function columnsOf(cards: BoardCard[]): Columns {
-  const columns: Columns = { not_started: [], in_progress: [], done: [] };
-  for (const card of [...cards].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)) {
-    columns[card.status].push(card);
+function boardOf(data: BoardData): Board {
+  const lanes: Record<string, BoardCard[]> = {};
+  for (const column of allColumns(data.columns)) lanes[laneId(column)] = [];
+  for (const card of [...data.cards].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)) {
+    (lanes[laneId(card.column)] ?? lanes.not_started).push(card);
   }
-  return columns;
+  return { middle: data.columns, lanes };
 }
 
-/** The column a draggable or droppable id is in: a column's own id, or a card's. */
-function columnOf(columns: Columns, id: UniqueIdentifier): Status | null {
-  if (STATUSES.includes(id as Status)) return id as Status;
-  return STATUSES.find((status) => columns[status].some((card) => card.id === id)) ?? null;
+/** The lane a draggable or droppable id is in: a lane's own id, or a card's. */
+function laneOf(board: Board, id: UniqueIdentifier): string | null {
+  if (typeof id === "string" && id in board.lanes) return id;
+  return (
+    Object.keys(board.lanes).find((lane) => board.lanes[lane].some((c) => c.id === id)) ?? null
+  );
 }
+
+const everyCard = (board: Board) => Object.values(board.lanes).flat();
 
 export function BoardPage() {
-  const { canEdit, isAdmin, isMentor, userId: me } = useAuthUser();
-  const [columns, setColumns] = useState<Columns | null>(null);
+  const { canEdit, canAssign, isAdmin, isMentor, userId: me } = useAuthUser();
+  const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragged, setDragged] = useState<BoardCard | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -63,7 +76,7 @@ export function BoardPage() {
   /** When the names were last asked for: again for someone new on a card, a minute apart. */
   const namesAsked = useRef(0);
   /** The board as it was when a drag started, to put back if it's canceled. */
-  const before = useRef<Columns | null>(null);
+  const before = useRef<Board | null>(null);
   /** Changes on their way: a poll's answer from before them would undo them on screen. */
   const busy = useRef(0);
 
@@ -75,16 +88,18 @@ export function BoardPage() {
 
   const refresh = useCallback(async () => {
     if (before.current || busy.current > 0) return;
-    const res = await api.cards.$get().catch(() => null);
+    const res = await api.board.$get().catch(() => null);
     if (!res) return setError("Can't reach Planner. Retrying…");
     if (!res.ok) return setError(await getErrorMessage(res));
-    const cards = await res.json();
+    const data = await res.json();
     if (before.current || busy.current > 0) return;
-    setColumns(columnsOf(cards));
+    setBoard(boardOf(data));
     setError(null);
-    const someoneNew = cards.some((c) => c.memberIds.some((id) => !known.current.has(id)));
-    if (someoneNew && Date.now() - namesAsked.current > 60_000) loadNames();
-  }, [loadNames]);
+    const someoneNew = data.cards.some((c) => c.memberIds.some((id) => !known.current.has(id)));
+    // Whoever puts other people on cards picks from everyone's names, so they're loaded at once.
+    const firstTime = canAssign && namesAsked.current === 0;
+    if (firstTime || (someoneNew && Date.now() - namesAsked.current > 60_000)) loadNames();
+  }, [loadNames, canAssign]);
 
   useEffect(() => {
     refresh();
@@ -121,34 +136,60 @@ export function BoardPage() {
     [refresh],
   );
 
-  /** Puts the viewer on a card or takes them off, showing it at once. */
-  const toggleMe = useCallback(
-    (card: BoardCard) => {
-      const on = card.memberIds.includes(me);
-      const memberIds = on ? card.memberIds.filter((id) => id !== me) : [...card.memberIds, me];
-      setColumns((current) =>
-        current
+  /** Puts someone on a card or takes them off, showing it at once. */
+  const setOnCard = useCallback(
+    (card: BoardCard, userId: string, on: boolean) => {
+      const memberIds = on
+        ? [...card.memberIds.filter((id) => id !== userId), userId]
+        : card.memberIds.filter((id) => id !== userId);
+      const lane = laneId(card.column);
+      setBoard((current) =>
+        current?.lanes[lane]
           ? {
               ...current,
-              [card.status]: current[card.status].map((c) =>
-                c.id === card.id ? { ...c, memberIds } : c,
-              ),
+              lanes: {
+                ...current.lanes,
+                [lane]: current.lanes[lane].map((c) =>
+                  c.id === card.id ? { ...c, memberIds } : c,
+                ),
+              },
             }
           : current,
       );
-      const param = { id: String(card.id) };
-      change(() =>
-        on
-          ? api.cards[":id"].members.me.$delete({ param })
-          : api.cards[":id"].members.me.$put({ param }),
-      );
+      const id = String(card.id);
+      change(() => {
+        if (userId === me) {
+          const param = { id };
+          return on
+            ? api.cards[":id"].members.me.$put({ param })
+            : api.cards[":id"].members.me.$delete({ param });
+        }
+        const param = { id, userId };
+        return on
+          ? api.cards[":id"].members[":userId"].$put({ param })
+          : api.cards[":id"].members[":userId"].$delete({ param });
+      });
     },
     [me, change],
   );
 
+  const toggleMe = useCallback(
+    (card: BoardCard) => setOnCard(card, me, !card.memberIds.includes(me)),
+    [me, setOnCard],
+  );
+
   const people = useMemo<People>(
-    () => ({ me, canEdit, isAdmin, names, toggleMe, askDelete: setDeleting }),
-    [me, canEdit, isAdmin, names, toggleMe],
+    () => ({
+      me,
+      canEdit,
+      canAssign,
+      isAdmin,
+      names,
+      toggleMe,
+      setOnCard,
+      askDelete: setDeleting,
+    }),
+    [me, canEdit, canAssign, isAdmin, names, toggleMe, setOnCard],
   );
 
   const sensors = useSensors(
@@ -163,7 +204,7 @@ export function BoardPage() {
     }),
   );
 
-  if (!columns) {
+  if (!board) {
     return error ? (
       <Page title="Board">
         <ErrorBanner message={error} />
@@ -174,28 +215,32 @@ export function BoardPage() {
   }
 
   function onDragStart({ active }: DragStartEvent) {
-    if (!columns) return;
-    before.current = columns;
-    setDragged(STATUSES.flatMap((s) => columns[s]).find((c) => c.id === active.id) ?? null);
+    if (!board) return;
+    before.current = board;
+    setDragged(everyCard(board).find((c) => c.id === active.id) ?? null);
   }
 
   // Into another column as it's dragged over it, so the card makes room there.
   function onDragOver({ active, over }: DragOverEvent) {
     if (!over) return;
-    setColumns((current) => {
+    setBoard((current) => {
       if (!current) return current;
-      const from = columnOf(current, active.id);
-      const to = columnOf(current, over.id);
-      if (!from || !to || from === to) return current;
-      const card = current[from].find((c) => c.id === active.id);
+      const from = laneOf(current, active.id);
+      const to = laneOf(current, over.id);
+      const column = to ? columnOfLane(to) : null;
+      if (!from || !to || column === null || from === to) return current;
+      const card = current.lanes[from].find((c) => c.id === active.id);
       if (!card) return current;
-      const target = current[to];
+      const target = current.lanes[to];
       const overIndex = target.findIndex((c) => c.id === over.id);
       const at = overIndex >= 0 ? overIndex : target.length;
       return {
         ...current,
-        [from]: current[from].filter((c) => c.id !== active.id),
-        [to]: [...target.slice(0, at), { ...card, status: to }, ...target.slice(at)],
+        lanes: {
+          ...current.lanes,
+          [from]: current.lanes[from].filter((c) => c.id !== active.id),
+          [to]: [...target.slice(0, at), { ...card, column }, ...target.slice(at)],
+        },
       };
     });
   }
@@ -204,13 +249,14 @@ export function BoardPage() {
     const start = before.current;
     before.current = null;
     setDragged(null);
-    if (!columns || !start) return;
-    const to = over ? columnOf(columns, over.id) : null;
-    if (!over || !to) {
-      setColumns(start);
+    if (!board || !start) return;
+    const to = over ? laneOf(board, over.id) : null;
+    const column = to ? columnOfLane(to) : null;
+    if (!over || !to || column === null) {
+      setBoard(start);
       return;
     }
-    const list = columns[to];
+    const list = board.lanes[to];
     const oldIndex = list.findIndex((c) => c.id === active.id);
     const overIndex = list.findIndex((c) => c.id === over.id);
     const sorted =
@@ -218,16 +264,16 @@ export function BoardPage() {
         ? arrayMove(list, oldIndex, overIndex)
         : list;
     const index = sorted.findIndex((c) => c.id === active.id);
-    const was = STATUSES.find((s) => start[s].some((c) => c.id === active.id));
-    const wasIndex = was ? start[was].findIndex((c) => c.id === active.id) : -1;
-    setColumns({ ...columns, [to]: sorted });
+    const was = laneOf(start, active.id);
+    const wasIndex = was ? start.lanes[was].findIndex((c) => c.id === active.id) : -1;
+    setBoard({ ...board, lanes: { ...board.lanes, [to]: sorted } });
     if (index < 0 || (was === to && wasIndex === index)) return;
     const id = String(active.id);
-    change(() => api.cards[":id"].move.$put({ param: { id }, json: { status: to, index } }));
+    change(() => api.cards[":id"].move.$put({ param: { id }, json: { column, index } }));
   }
 
   function onDragCancel() {
-    if (before.current) setColumns(before.current);
+    if (before.current) setBoard(before.current);
     before.current = null;
     setDragged(null);
   }
@@ -239,11 +285,9 @@ export function BoardPage() {
     return ok;
   }
 
-  // The card that's open, as it is now: everyone's changes show in its dialog too.
+  const columns = allColumns(board.middle);
   const editing =
-    editingId === null
-      ? null
-      : (STATUSES.flatMap((s) => columns[s]).find((c) => c.id === editingId) ?? null);
+    editingId === null ? null : (everyCard(board).find((c) => c.id === editingId) ?? null);
 
   return (
     <PeopleContext.Provider value={people}>
@@ -254,7 +298,7 @@ export function BoardPage() {
             ? "Add cards and drag them between columns. Everyone on the team sees the same board."
             : "Everyone on the team sees the same board. Sign in on your own device to change it."
         }
-        width="wide"
+        width="full"
         actions={isMentor ? <SendOverview /> : undefined}
       >
         {error && <ErrorBanner message={error} />}
@@ -269,23 +313,33 @@ export function BoardPage() {
           onDragEnd={onDragEnd}
           onDragCancel={onDragCancel}
         >
-          <div className="grid gap-4 md:grid-cols-3">
-            {STATUSES.map((status) => (
-              <BoardColumn
-                key={status}
-                status={status}
-                label={LABELS[status]}
-                cards={columns[status]}
-                canEdit={canEdit}
-                onOpen={(card) => setEditingId(card.id)}
-              />
-            ))}
+          {/* Side by side from tablet width up, scrolling sideways when there are many. */}
+          <div className="relative overflow-x-auto pb-2">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start">
+              {columns.map((column) => (
+                <div key={laneId(column)} className="contents">
+                  {/* No columns between Not Started and Done yet: where they'd be. */}
+                  {column === "done" && !board.middle.length && <NoMiddleColumns />}
+                  <BoardColumn
+                    lane={laneId(column)}
+                    label={columnName(column, board.middle)}
+                    cards={board.lanes[laneId(column)] ?? []}
+                    canEdit={canEdit}
+                    onOpen={(card) => setEditingId(card.id)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
           <DragOverlay>{dragged && <CardFace card={dragged} lifted />}</DragOverlay>
         </DndContext>
         {editing && (
           <CardDialog
             card={editing}
+            columns={columns.map((column) => ({
+              column,
+              name: columnName(column, board.middle),
+            }))}
             canEdit={canEdit}
             onClose={() => setEditingId(null)}
             onRename={(title) =>
@@ -293,11 +347,11 @@ export function BoardPage() {
                 api.cards[":id"].$patch({ param: { id: String(editing.id) }, json: { title } }),
               )
             }
-            onMove={(status) =>
+            onMove={(column: Column) =>
               change(() =>
                 api.cards[":id"].move.$put({
                   param: { id: String(editing.id) },
-                  json: { status, index: columns[status].length },
+                  json: { column, index: board.lanes[laneId(column)]?.length ?? 0 },
                 }),
               )
             }

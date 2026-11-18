@@ -5,7 +5,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./limits": "./src/limits.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8799 --inspector-port 9241",

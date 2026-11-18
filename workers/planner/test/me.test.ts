@@ -13,13 +13,15 @@ it("says who is signed in, their roles and whether they change the board", async
     isMentor: false,
     isAdmin: false,
     canEdit: true,
+    canAssign: false,
   });
-  expect(await jsonAs(mentor, "/me")).toMatchObject({ isMentor: true });
+  expect(await jsonAs(mentor, "/me")).toMatchObject({ isMentor: true, canAssign: true });
   expect(await jsonAs(admin, "/me")).toMatchObject({ isAdmin: true });
   // A kiosk PIN session never has a role, even an admin's.
   expect(await jsonAs(kioskAdmin, "/me")).toMatchObject({
     isMentor: false,
     isAdmin: false,
     canEdit: false,
+    canAssign: false,
   });
 });

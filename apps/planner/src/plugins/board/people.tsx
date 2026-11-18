@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { focusRing } from "@g3/ui";
-import { Trash2 } from "lucide-react";
+import { PersonPicker, focusRing } from "@g3/ui";
+import { Trash2, X } from "lucide-react";
 import { createContext, useContext } from "react";
 import type { BoardCard } from "../../shared/api";
 
@@ -8,10 +8,14 @@ import type { BoardCard } from "../../shared/api";
 export type People = {
   me: string;
   canEdit: boolean;
+  /** Mentors, admins and trusted students put anyone on a card or take them off. */
+  canAssign: boolean;
   /** Only admins delete cards. */
   isAdmin: boolean;
   names: Map<string, string>;
   toggleMe: (card: BoardCard) => void;
+  /** Puts someone on a card or takes them off (canAssign, or the viewer themselves). */
+  setOnCard: (card: BoardCard, userId: string, on: boolean) => void;
   /** Asks whether to delete a card. */
   askDelete: (card: BoardCard) => void;
 };
@@ -41,6 +45,57 @@ export function CardPeople({ card }: { card: BoardCard }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Who's on a card, for mentors, admins and trusted students: each name with a button to take them
+ * off, and a list to put anyone else on (the viewer uses Add me). Each change is saved at once.
+ */
+export function AssignPeople({ card }: { card: BoardCard }) {
+  const { me, names, setOnCard } = usePeople();
+  const ids = [...card.memberIds].sort((a, b) => Number(b === me) - Number(a === me));
+  const others = [...names]
+    .filter(([id]) => id !== me && !card.memberIds.includes(id))
+    .map(([id, displayName]) => ({ id, displayName }));
+  return (
+    <div className="space-y-2">
+      {ids.length ? (
+        <ul className="flex flex-wrap gap-1" aria-label="On this card">
+          {ids.map((id) => {
+            const name = id === me ? "You" : (names.get(id) ?? "Former member");
+            return (
+              <li
+                key={id}
+                className={`flex max-w-full min-w-0 items-center gap-0.5 rounded-full py-0.5 pr-0.5 pl-2 text-xs ${id === me ? "bg-primary-100 text-primary-800" : "bg-inset text-secondary-700"}`}
+              >
+                <span className="truncate" title={names.get(id)}>
+                  {name}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Take ${name} off this card`}
+                  title="Take off this card"
+                  onClick={() => setOnCard(card, id, false)}
+                  className={`shrink-0 rounded-full p-0.5 hover:bg-secondary-200 ${focusRing}`}
+                >
+                  <X aria-hidden className="size-3" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-sm text-secondary-500">Nobody yet.</p>
+      )}
+      <PersonPicker
+        people={others}
+        label="Add someone to this card"
+        placeholder="Add someone…"
+        emptyText={names.size ? "Everyone is on this card." : "Loading names…"}
+        onPick={(id) => setOnCard(card, id, true)}
+      />
+    </div>
   );
 }
 

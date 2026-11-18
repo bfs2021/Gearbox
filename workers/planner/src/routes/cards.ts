@@ -10,14 +10,18 @@ import {
 import { asc, eq, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
-import { createDb } from "../db";
-import { type Status, cardMembers, cards } from "../db/schema";
-import { CARD_COLUMNS, addCard, afterChange } from "../lib/cards";
-import { nowSeconds, parseId, parseStatus, parseTitle } from "../lib/input";
+import { type Db, createDb } from "../db";
+import { cardMembers, cards } from "../db/schema";
+import { CARD_COLUMNS, addCard, afterChange, toCard } from "../lib/cards";
+import { type Column, inColumn, isTeamColumn, parseColumn, placeOf } from "../lib/columns";
+import { nowSeconds, parseId, parseTitle } from "../lib/input";
+import { requireAssigner } from "../lib/trusted";
 import type { AppEnv } from "../types";
 
 // The team's board. Everyone signed in reads it; everyone but a kiosk adds, renames and moves
-// cards, and puts themselves on a card or takes themselves off. Only admins delete cards. Pages poll GET /cards, so everyone's board follows the others'.
+// cards, and puts themselves on a card or takes themselves off. Mentors, admins and trusted
+// students (src/lib/trusted.ts) put anyone on a card or take them off. Only admins delete cards. Pages
+// poll GET /board (src/index.ts), so everyone's board follows the others'.
 
 const TITLE_ERROR = "Give the card a title (up to 200 characters).";
 
@@ -37,38 +41,41 @@ const rename = validator("json", (value, c): { title: string } => {
   return { title };
 });
 
-const place = validator("json", (value, c): { status: Status; index: number } => {
+const place = validator("json", (value, c): { column: Column; index: number } => {
   const v = fieldsOf(value);
-  const status = parseStatus(v.status);
+  const column = parseColumn(v.column);
   const index = v.index;
-  if (!status || typeof index !== "number" || !Number.isInteger(index) || index < 0) {
+  if (column === null || typeof index !== "number" || !Number.isInteger(index) || index < 0) {
     return c.json({ error: "Say which column and where in it." }, 400) as never;
   }
-  return { status, index };
+  return { column, index };
 });
 
+/** Every card with who's on it, in board order, as a page gets them. */
+export async function boardCards(db: Db, teamId: string) {
+  const [rows, members] = await Promise.all([
+    db
+      .select(CARD_COLUMNS)
+      .from(cards)
+      .where(inTeam(cards, teamId))
+      .orderBy(asc(cards.sortOrder), asc(cards.id))
+      .all(),
+    db
+      .select({ cardId: cardMembers.cardId, userId: cardMembers.userId })
+      .from(cardMembers)
+      .where(inTeam(cardMembers, teamId))
+      .orderBy(asc(cardMembers.addedAt))
+      .all(),
+  ]);
+  const on = new Map<number, string[]>();
+  for (const m of members) on.set(m.cardId, [...(on.get(m.cardId) ?? []), m.userId]);
+  return rows.map((row) => ({ ...toCard(row), memberIds: on.get(row.id) ?? [] }));
+}
+
 export const cardsRouter = new Hono<AppEnv>()
-  .get("/", requireAuth, async (c) => {
-    const db = createDb(c.env.PLANNER_DB);
-    const teamId = c.get("teamId");
-    const [rows, members] = await Promise.all([
-      db
-        .select(CARD_COLUMNS)
-        .from(cards)
-        .where(inTeam(cards, teamId))
-        .orderBy(asc(cards.status), asc(cards.sortOrder), asc(cards.id))
-        .all(),
-      db
-        .select({ cardId: cardMembers.cardId, userId: cardMembers.userId })
-        .from(cardMembers)
-        .where(inTeam(cardMembers, teamId))
-        .orderBy(asc(cardMembers.addedAt))
-        .all(),
-    ]);
-    const on = new Map<number, string[]>();
-    for (const m of members) on.set(m.cardId, [...(on.get(m.cardId) ?? []), m.userId]);
-    return c.json(rows.map((card) => ({ ...card, memberIds: on.get(card.id) ?? [] })));
-  })
+  .get("/", requireAuth, async (c) =>
+    c.json(await boardCards(createDb(c.env.PLANNER_DB), c.get("teamId"))),
+  )
   // The team's names, for who's on each card.
   .get("/people", requireAuth, async (c) => {
     const members = await activeMembers(c.env, c.get("teamId"));
@@ -95,13 +102,14 @@ export const cardsRouter = new Hono<AppEnv>()
       .returning(CARD_COLUMNS);
     if (!card) return c.json({ error: "Card not found." }, 404);
     afterChange(c);
-    return c.json(card);
+    return c.json(toCard(card));
   })
-  // Puts a card in a column at `index` (0 is the top), renumbering that column.
+  // Puts a card in a column ("not_started", "done" or a middle column's id) at `index` (0 is the
+  // top), renumbering that column.
   .put("/:id/move", requireAuth, requireOAuthSession, place, async (c) => {
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Card not found." }, 404);
-    const { status, index } = c.req.valid("json");
+    const { column, index } = c.req.valid("json");
     const db = createDb(c.env.PLANNER_DB);
     const teamId = c.get("teamId");
     const card = await db
@@ -110,21 +118,25 @@ export const cardsRouter = new Hono<AppEnv>()
       .where(inTeam(cards, teamId, eq(cards.id, id)))
       .get();
     if (!card) return c.json({ error: "Card not found." }, 404);
+    if (typeof column === "number" && !(await isTeamColumn(db, teamId, column))) {
+      return c.json({ error: "That column is gone. Reload the board." }, 404);
+    }
 
     const others = await db
       .select({ id: cards.id })
       .from(cards)
-      .where(inTeam(cards, teamId, eq(cards.status, status), ne(cards.id, id)))
+      .where(inTeam(cards, teamId, inColumn(column), ne(cards.id, id)))
       .orderBy(asc(cards.sortOrder), asc(cards.id))
       .all();
     const order = others.map((r) => r.id);
     order.splice(Math.min(index, order.length), 0, id);
 
     const now = nowSeconds();
+    const place = placeOf(column);
     const [first, ...rest] = order.map((cardId, sortOrder) =>
       db
         .update(cards)
-        .set(cardId === id ? { status, sortOrder, updatedAt: now } : { sortOrder })
+        .set(cardId === id ? { ...place, sortOrder, updatedAt: now } : { sortOrder })
         .where(inTeam(cards, teamId, eq(cards.id, cardId))),
     );
     await db.batch([first, ...rest]);
@@ -161,6 +173,49 @@ export const cardsRouter = new Hono<AppEnv>()
           c.get("teamId"),
           eq(cardMembers.cardId, id),
           eq(cardMembers.userId, c.get("userId")),
+        ),
+      );
+    afterChange(c);
+    return c.json({ ok: true });
+  })
+  // Puts someone else on a card, or takes them off: mentors, admins and trusted students.
+  .put("/:id/members/:userId", requireAuth, requireOAuthSession, requireAssigner, async (c) => {
+    const id = parseId(c.req.param("id"));
+    if (!id) return c.json({ error: "Card not found." }, 404);
+    const userId = c.req.param("userId");
+    const db = createDb(c.env.PLANNER_DB);
+    const teamId = c.get("teamId");
+    const [card, members] = await Promise.all([
+      db
+        .select({ id: cards.id })
+        .from(cards)
+        .where(inTeam(cards, teamId, eq(cards.id, id)))
+        .get(),
+      activeMembers(c.env, teamId),
+    ]);
+    if (!card) return c.json({ error: "Card not found." }, 404);
+    if (!members) return c.json({ error: "Can't reach the team's member list. Try again." }, 503);
+    if (!members.some((m) => m.id === userId)) {
+      return c.json({ error: "Only the team's active members can go on a card." }, 400);
+    }
+    await db
+      .insert(cardMembers)
+      .values(withTeam(teamId, { cardId: id, userId, addedAt: nowSeconds() }))
+      .onConflictDoNothing();
+    afterChange(c);
+    return c.json({ ok: true });
+  })
+  .delete("/:id/members/:userId", requireAuth, requireOAuthSession, requireAssigner, async (c) => {
+    const id = parseId(c.req.param("id"));
+    if (!id) return c.json({ error: "Card not found." }, 404);
+    await createDb(c.env.PLANNER_DB)
+      .delete(cardMembers)
+      .where(
+        inTeam(
+          cardMembers,
+          c.get("teamId"),
+          eq(cardMembers.cardId, id),
+          eq(cardMembers.userId, c.req.param("userId")),
         ),
       );
     afterChange(c);

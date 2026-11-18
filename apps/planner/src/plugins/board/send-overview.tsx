@@ -28,7 +28,9 @@ export function SendOverview() {
   async function send() {
     setBusy(true);
     setResult(null);
-    const res = await api.overviews.$post().catch(() => null);
+    // The date in its heading is today where the sender is.
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const res = await api.overviews.$post({ json: { timeZone } }).catch(() => null);
     setBusy(false);
     if (!res) return setResult({ ok: false, message: "Can't reach Planner. Try again." });
     if (!res.ok) return setResult({ ok: false, message: await getErrorMessage(res) });
