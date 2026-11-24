@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ItemView, StockView } from "@g3/worker-inventory";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "./api";
 import { useInventory } from "./inventory-data";
+import { parseQuantity, quantityPatch } from "./quantity-edit";
 import { AddStockDialog, CheckInDialog, CheckOutDialog, MoveDialog } from "./stock-dialogs";
 import { UnitSuffix } from "./units";
 
@@ -10,9 +11,9 @@ import { UnitSuffix } from "./units";
 // page): its quantity, its location, and checking it out or in.
 
 /**
- * A row's quantity, changed in place: type the number that's there and press Enter (or click
- * away). That's recorded as a count, with who counted. `unit` is the entry's, shown after the box.
- * `compact`: a narrower box, for a phone.
+ * A row's quantity, changed in place: type the number or use the up/down arrows. The count is
+ * recorded automatically after the last change (or right away on blur/Enter), with who counted.
+ * `unit` is the entry's, shown after the box. `compact`: a narrower box, for a phone.
  */
 export function QuantityCell({
   stock,
@@ -24,17 +25,27 @@ export function QuantityCell({
   const [text, setText] = useState(String(stock.quantity));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const busyRef = useRef(false);
 
   useEffect(() => setText(String(stock.quantity)), [stock.quantity]);
+  useEffect(
+    () => () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    },
+    [],
+  );
 
-  async function save() {
-    const n = Number(text);
-    if (text.trim() === "" || !Number.isInteger(n) || n < 0 || n > 1_000_000) {
-      setError("Enter a whole number, 0 or more.");
-      return;
+  function cancelTimer() {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
     }
-    setError(null);
-    if (n === stock.quantity) return;
+  }
+
+  async function writeQuantity(n: number) {
+    if (n === stock.quantity || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const res = await api.stock[":id"].$patch({
@@ -50,8 +61,39 @@ export function QuantityCell({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
+  }
+
+  function handleChange(next: string) {
+    setText(next);
+    cancelTimer();
+    const patch = quantityPatch(parseQuantity(next), stock.quantity);
+    if (patch.kind === "error") {
+      setError("Enter a whole number, 0 or more.");
+      return;
+    }
+    setError(null);
+    if (patch.kind === "save") {
+      // The native spinner changes the value without blurring the field. Save shortly after
+      // the last change so its ticks are recorded, while intermediate typing is not.
+      const n = patch.quantity;
+      saveTimer.current = setTimeout(() => {
+        saveTimer.current = null;
+        void writeQuantity(n);
+      }, 400);
+    }
+  }
+
+  function saveNow() {
+    cancelTimer();
+    const patch = quantityPatch(parseQuantity(text), stock.quantity);
+    if (patch.kind === "error") {
+      setError("Enter a whole number, 0 or more.");
+      return;
+    }
+    if (patch.kind === "save") void writeQuantity(patch.quantity);
   }
 
   return (
@@ -63,17 +105,18 @@ export function QuantityCell({
           min={0}
           step={1}
           aria-label="Quantity"
-          title="Type what's there and press Enter to record a count"
+          title="Type a quantity, or use the arrows to step it; the count is saved automatically"
           className={`${compact ? "w-16" : "w-20"} rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
             error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
           }`}
           disabled={busy}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => void save()}
+          onChange={(e) => handleChange(e.target.value)}
+          onBlur={saveNow}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") {
+              cancelTimer();
               setText(String(stock.quantity));
               setError(null);
             }
