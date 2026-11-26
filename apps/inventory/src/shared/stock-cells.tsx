@@ -3,7 +3,7 @@ import type { ItemView, StockView } from "@g3/worker-inventory";
 import { useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "./api";
 import { useInventory } from "./inventory-data";
-import { parseQuantity, quantityPatch } from "./quantity-edit";
+import { isStep, parseQuantity, quantityPatch } from "./quantity-edit";
 import { AddStockDialog, CheckInDialog, CheckOutDialog, MoveDialog } from "./stock-dialogs";
 import { UnitSuffix } from "./units";
 
@@ -11,9 +11,10 @@ import { UnitSuffix } from "./units";
 // page): its quantity, its location, and checking it out or in.
 
 /**
- * A row's quantity, changed in place: type the number or use the up/down arrows. The count is
- * recorded automatically after the last change (or right away on blur/Enter), with who counted.
- * `unit` is the entry's, shown after the box. `compact`: a narrower box, for a phone.
+ * A row's quantity, changed in place: type the number and press Enter (or click away), or step it
+ * with the up/down arrows, which saves shortly after the last step. That's recorded as a count,
+ * with who counted. `unit` is the entry's, shown after the box. `compact`: a narrower box, for a
+ * phone.
  */
 export function QuantityCell({
   stock,
@@ -66,24 +67,21 @@ export function QuantityCell({
     }
   }
 
-  function handleChange(next: string) {
+  function handleChange(next: string, input: HTMLInputElement, inputType: string | undefined) {
     setText(next);
     cancelTimer();
+    // Typing waits for Enter or blur, so a half-typed number is never saved. A step is saved
+    // shortly after the last one: a click on Firefox's arrows doesn't focus the box, so no blur
+    // would follow it.
+    if (!isStep(inputType) && document.activeElement === input) return;
     const patch = quantityPatch(parseQuantity(next), stock.quantity);
-    if (patch.kind === "error") {
-      setError("Enter a whole number, 0 or more.");
-      return;
-    }
+    if (patch.kind !== "save") return;
     setError(null);
-    if (patch.kind === "save") {
-      // The native spinner changes the value without blurring the field. Save shortly after
-      // the last change so its ticks are recorded, while intermediate typing is not.
-      const n = patch.quantity;
-      saveTimer.current = setTimeout(() => {
-        saveTimer.current = null;
-        void writeQuantity(n);
-      }, 400);
-    }
+    const n = patch.quantity;
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      void writeQuantity(n);
+    }, 400);
   }
 
   function saveNow() {
@@ -105,13 +103,21 @@ export function QuantityCell({
           min={0}
           step={1}
           aria-label="Quantity"
-          title="Type a quantity, or use the arrows to step it; the count is saved automatically"
+          title="Type what's there and press Enter, or use the arrows, to record a count"
           className={`${compact ? "w-16" : "w-20"} rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
-            error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
+            error ? "border-red-500" : "border-secondary-200 hover:border-secondary-400"
           }`}
-          disabled={busy}
+          // Read-only rather than disabled while saving, so the box keeps the focus.
+          readOnly={busy}
+          aria-busy={busy}
           value={text}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) =>
+            handleChange(
+              e.target.value,
+              e.currentTarget,
+              (e.nativeEvent as Partial<InputEvent>).inputType,
+            )
+          }
           onBlur={saveNow}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();

@@ -13,7 +13,7 @@ const compiled = ts.transpileModule(source, {
 });
 const lib = {};
 new Function("exports", compiled.outputText)(lib);
-const { parseQuantity, quantityPatch } = lib;
+const { isStep, parseQuantity, quantityPatch } = lib;
 
 /** A native number input's spinner changes the value without blurring; that change must save. */
 test("spinner step produces a save patch for the new quantity", () => {
@@ -36,5 +36,12 @@ test("invalid input produces an error, never a save", () => {
     const parsed = parseQuantity(bad);
     assert.equal(parsed.ok, false, `expected ${JSON.stringify(bad)} invalid`);
     assert.deepEqual(quantityPatch(parsed, 5), { kind: "error" });
+  }
+});
+
+test("arrow steps save as they happen; typing, deleting and undo wait for Enter or blur", () => {
+  for (const step of [undefined, ""]) assert.equal(isStep(step), true);
+  for (const typed of ["insertText", "insertFromPaste", "deleteContentBackward", "historyUndo"]) {
+    assert.equal(isStep(typed), false, typed);
   }
 });
